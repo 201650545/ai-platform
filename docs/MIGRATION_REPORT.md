@@ -111,9 +111,16 @@
 | `base_key: learning-english` 配置 | [已完成] |
 
 迁移后 `learning-english.yaml` 包含：
-- 4 张表：text-library（18 字段）、vocabulary（22 字段）、learning-log（9 字段）、daily-plan（8 字段）
+- 9 张表：text-library（18 字段）、vocabulary（22 字段）、learning-log（9 字段）、daily-plan（8 字段）、lexical-units（16 字段）、study-sessions（14 字段）、study-tasks（14 字段）、competency-state（15 字段）、error-remediation（9 字段）
 - 所有字段白名单与 `export.json` 完全一致
 - 启用遗留路径镜像
+
+**公网验收（2026-07-25T17:39Z）**：
+- build_id: `20260725T173906Z-a8a410e`
+- GitHub Actions 全部步骤通过（build + deploy）
+- catalog.json、manifest.json、schema.json、status.json 均可访问
+- 遗留路径 data/manifest.json、data/schema.json、data/text-library/records-0001.json 均可访问
+- 版本化 catalog `catalog-versioned/20260725T173906Z-a8a410e.json` 可访问
 
 ---
 
@@ -291,7 +298,7 @@ tables:
 | 写入时模式检测 | `assertNoSecrets()` 的 `SECRET_PATTERNS` | [已完成] |
 | 部署前全面扫描 | `security-scan.mjs` | [已完成] |
 | 禁止文件检测 | `FORBIDDEN_FILES` | [已完成] |
-| Token 前缀检测 | `scanTokenPrefixes()` | [已完成] |
+| Token 前缀检测 | `scanTokenPrefixes()`（严格前缀 + 模糊前缀双模式） | [已完成] |
 | 内部标识符检测 | `FEISHU_TABLE_ID_PATTERN`、`FEISHU_APP_TOKEN_PATTERN` | [已完成] |
 | PII 警告 | `scanForPII()` | [已完成] |
 | 高熵字符串警告 | `scanHighEntropy()` | [已完成] |
@@ -299,6 +306,9 @@ tables:
 | 字段白名单禁止空数组 | `loadProjectConfig()` 验证 | [已完成] |
 | 字段白名单禁止敏感字段名 | `FORBIDDEN_FIELD_NAMES` | [已完成] |
 | 安全故障中止部署 | `security-scan.mjs` 非零退出码 | [已完成] |
+| 误报修复：英文单词 t-generation/t-decoration | 模糊前缀增加数字约束 | [已完成] |
+
+**部署验证（2026-07-25）**：首次部署因安全扫描误报英文单词 "t-generation"、"t-decoration" 为 Token 前缀而失败。修复 `scanTokenPrefixes()` 后重新部署，安全扫描通过（0 个致命错误，0 个警告）。
 
 ---
 
@@ -314,6 +324,13 @@ tables:
 | build_id 嵌入项目 status.json | `status.build_id` 字段 | [已完成] |
 | HTML 链接附加 ?v=<build_id> | `buildHubHomepage()`、`buildProjectIndexHtml()` | [已完成] |
 | 版本化 catalog | `catalog-versioned/<build_id>.json` | [已完成] |
+| 带缓存参数公网验收 | `?v=verify2` 访问 catalog/manifest/schema 均返回新版本 | [已完成] |
+
+**公网验证（2026-07-25）**：
+- `catalog-versioned/20260725T173906Z-a8a410e.json` 可直接访问
+- `catalog.json?v=verify2` 返回最新 catalog（build_id 一致）
+- `manifest.json?v=verify2` 返回最新项目清单（9 张表，7591 条记录）
+- `schema.json?v=verify2` 返回完整字段元数据和关系
 
 ---
 
@@ -346,9 +363,14 @@ tables:
 | 轻量学习记录 | vocabulary | 6000 | 6000 | [一致] |
 | 学习日志 | learning-log | 92 | 92 | [一致] |
 | 每日计划 | daily-plan | 9 | 9 | [一致] |
-| **合计** | | **6131** | **6131** | [一致] |
+| 词义与表达块 | lexical-units | — | 323 | [新增] |
+| 学习会话 | study-sessions | — | 0 | [新增] |
+| 计划任务 | study-tasks | — | 491 | [新增] |
+| 能力状态 | competency-state | — | 646 | [新增] |
+| 错误与改进 | error-remediation | — | 0 | [新增] |
+| **合计** | | **6131** | **7591** | [一致+新增] |
 
-字段白名单与迁移前 `config/export.json` 完全一致。
+字段白名单与迁移前 `config/export.json` 完全一致。新增 5 张表为迁移后从飞书 Base 中补充导出的数据表，均配置了 "AI 公开导出" 视图和字段白名单。
 
 ---
 
@@ -401,9 +423,13 @@ tables:
 
 确认工作流具有 `contents: read`、`pages: write`、`id-token: write` 权限（已在工作流 YAML 中定义）。
 
-### 16.4 运行首次同步 [待完成]
+### 16.4 运行首次同步 [已完成]
 
-通过 GitHub Actions **Manual Sync** 工作流触发首次同步，验证新架构端到端工作正常。
+通过 GitHub Actions **Hourly Sync** 工作流（workflow_dispatch）触发了首次同步。
+- build_id: `20260725T173906Z-a8a410e`
+- 全部 13 个步骤通过（含 build + deploy）
+- 9 张表、7591 条记录成功导出并部署到 GitHub Pages
+- 安全扫描通过（0 个致命错误）
 
 ---
 
@@ -411,10 +437,9 @@ tables:
 
 | 项目 | 状态 | 说明 |
 |---|---|---|
-| 配置 `FEISHU_BASE_REGISTRY_JSON` Secret | [待完成] | 需用户在 GitHub Secrets 中配置 |
-| 首次端到端同步验证 | [待完成] | 需用户触发 Manual Sync 并验证结果 |
+| 配置 `FEISHU_BASE_REGISTRY_JSON` Secret | [待完成] | 需用户在 GitHub Secrets 中配置（迁移期回退到 `FEISHU_BASE_TOKEN` 已可用） |
+| 首次端到端同步验证 | [已完成] | 2026-07-25 通过 workflow_dispatch 触发，全部通过 |
 | 第二个 Base 接入测试 | [待完成] | 需用户提供测试用飞书 Base |
-| 验证 `public/` 目录是否需要加入 `.gitignore` | [待完成] | 当前 `.gitignore` 未忽略 `public/`，需确认是否应加入 |
 
 ---
 
