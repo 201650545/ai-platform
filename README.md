@@ -1,170 +1,150 @@
-# Feishu Learning English Public Export
+# Feishu Data Hub
 
-This repository exports explicitly approved Feishu Bitable views and fields
-to static JSON on GitHub Pages, enabling AI tools to read the data model,
-records, and inter-table relationships without Feishu access.
+统一公开导出的飞书多维表格数据中心。将飞书 Bitable 数据导出为静态 JSON，部署到 GitHub Pages，供 AI 工具和其他消费者读取数据模型、记录和表间关联，无需飞书访问权限。
 
-## Public entry points
+**站点地址**：https://201650545.github.io/feishu-learning-english-export/
 
-| File | Purpose |
+---
+
+## 公开入口
+
+| 路径 | 用途 |
 |---|---|
-| `/` (index.html) | Human-readable overview with links to all tables |
-| `/data/manifest.json` | Machine-readable table list with checksums |
-| `/data/schema.json` | Full data model: field types, options, relations |
+| `/catalog.json` | 全局目录，索引所有项目及其状态 |
+| `/index.html` | Hub 首页，人类可读的项目总览 |
+| `/projects/<slug>/manifest.json` | 项目清单（表列表 + 校验和） |
+| `/projects/<slug>/schema.json` | 项目数据模型（字段类型 + 关联） |
+| `/projects/<slug>/status.json` | 项目同步状态（sync_status、is_stale） |
+| `/projects/<slug>/index.html` | 项目首页，人类可读的表总览 |
+| `/data/manifest.json` | 遗留兼容清单（learning-english 镜像） |
+| `/data/schema.json` | 遗留兼容数据模型（learning-english 镜像） |
 
-## Current public tables
+---
 
-| Table | Slug | Fields | Records |
+## 当前项目
+
+| 项目 | Slug | 表数 | 记录数 | 说明 |
+|---|---|---|---|---|
+| 英语学习系统 | `learning-english` | 4 | 6131 | 词汇、文本、计划、日志 |
+
+### learning-english 数据表
+
+| 飞书表名 | Slug | 字段数 | 记录数 |
 |---|---|---|---|
 | 文本库 | `text-library` | 18 | 30 |
 | 轻量学习记录 | `vocabulary` | 22 | 6000 |
 | 学习日志 | `learning-log` | 9 | 92 |
 | 每日计划 | `daily-plan` | 8 | 9 |
 
-## How to add a new public table
+---
 
-1. **Create a view in Feishu**: Open the target table in the Feishu Base, add a new Grid View named exactly `AI 公开导出`.
-2. **Add a config entry** in `config/export.json` under `tables`:
-   ```json
-   {
-     "table_name": "表名",
-     "table_slug": "english-slug",
-     "view_name": "AI 公开导出",
-     "enabled": true,
-     "fields": ["字段1", "字段2"]
-   }
-   ```
-3. **Fill the field allowlist**: List every field name that is safe to export. Never use `*` (wildcard). Never include `app_secret`, `tenant_access_token`, `authorization`, `client_secret`, or any credential field name.
-4. **Push to GitHub**: The workflow runs automatically on the next cron tick (hourly at minute 17), or trigger it manually via `workflow_dispatch`.
+## 如何添加新项目
 
-## How to create the "AI 公开导出" view in Feishu
+简要步骤：
 
-1. Open the Feishu Base ("Learning English").
-2. Navigate to the target data table.
-3. Click the `+` button next to the last view tab.
-4. Select "Grid View" (表格视图).
-5. Name it exactly `AI 公开导出` (with the space).
-6. The view inherits all fields by default — field-level filtering is controlled by the `fields` allowlist in `config/export.json`.
+1. 在飞书 Base 中创建 `AI 公开导出` 视图
+2. 给统一飞书应用授予只读权限
+3. 更新 GitHub Secret `FEISHU_BASE_REGISTRY_JSON`
+4. 运行 `npm run project:add -- --slug <slug> --title "标题" --base-key <key>`
+5. 编辑项目 YAML，配置表和字段白名单
+6. Dry-run 验证 → 安全扫描 → 手动部署验证
 
-## Output JSON structure
+详见 **[docs/ONBOARDING.md](docs/ONBOARDING.md)**。
 
-```
-site/
-├── index.html              # Human-readable overview
-└── data/
-    ├── manifest.json       # v2: table list with checksums
-    ├── schema.json         # Field types, options, relations
-    ├── text-library/
-    │   ├── fields.json     # Field metadata
-    │   └── records-0001.json
-    ├── vocabulary/
-    │   ├── fields.json
-    │   ├── records-0001.json
-    │   └── records-0002.json  # ...up to 12 chunks
-    ├── learning-log/
-    │   ├── fields.json
-    │   └── records-0001.json
-    └── daily-plan/
-        ├── fields.json
-        └── records-0001.json
-```
+---
 
-Each record file contains:
-```json
-{
-  "schema_version": 1,
-  "table_name": "文本库",
-  "view_name": "AI 公开导出",
-  "chunk": 1,
-  "records": [
-    {
-      "record_id": "recXXXXXX",
-      "fields": { "字段名": "值" }
-    }
-  ]
-}
-```
-
-## Consuming manifest and schema
-
-**manifest.json** — Start here to discover available tables:
-```json
-{
-  "schema_version": 2,
-  "generated_at": "2026-07-25T...",
-  "base": { "name": "Learning English" },
-  "tables": [
-    {
-      "name": "文本库",
-      "slug": "text-library",
-      "view_name": "AI 公开导出",
-      "field_count": 18,
-      "record_count": 30,
-      "fields_file": "data/text-library/fields.json",
-      "fields_bytes": 1234,
-      "fields_sha256": "...",
-      "record_files": [
-        { "path": "data/text-library/records-0001.json", "record_count": 30, "bytes": 5678, "sha256": "..." }
-      ]
-    }
-  ]
-}
-```
-
-**schema.json** — Understand field types and relations:
-```json
-{
-  "schema_version": 1,
-  "tables": [
-    {
-      "slug": "vocabulary",
-      "primary_field": "单词",
-      "fields": [
-        { "field_name": "单词", "field_type": "Text", "multi_value": false },
-        { "field_name": "关联文本", "field_type": "DuplexLink", "multi_value": true,
-          "relation": { "target_table_slug": "text-library", "resolved": true } }
-      ]
-    }
-  ]
-}
-```
-
-## Local execution
+## 本地执行
 
 ```bash
-# Set environment variables
-export FEISHU_APP_ID="cli_xxxx"
-export FEISHU_APP_SECRET="xxxx"
-export FEISHU_BASE_TOKEN="xxxx"
+# 安装依赖
+npm ci
 
-# Syntax check
+# 语法检查
 npm run check
 
-# Sync (writes to site/)
+# 配置验证
+npm run validate:config
+
+# 同步所有项目（需设置飞书凭据环境变量）
 npm run sync
 
-# Validate (checks integrity, checksums, secrets)
+# 同步单个项目
+npm run sync:project -- <slug>
+# 或: node scripts/sync-hub.mjs --project <slug>
+
+# 全部验证（配置 + 输出 + 安全扫描）
 npm run validate
+
+# 仅安全扫描
+npm run security:scan
+
+# 添加新项目脚手架
+npm run project:add -- --slug <slug> --title "标题" --base-key <key>
 ```
 
-## Avoiding sensitive information
+所需环境变量：
 
-Two layers of protection:
+```bash
+export FEISHU_APP_ID="cli_xxxx"
+export FEISHU_APP_SECRET="xxxx"
+export FEISHU_BASE_REGISTRY_JSON='{"learning-english": {"app_token": "xxxx"}}'
+```
 
-1. **View-level**: Only the `AI 公开导出` view is exported. Tables without this view are skipped entirely.
-2. **Field-level**: The `fields` allowlist in `config/export.json` explicitly lists every exported field. No wildcard mode.
+---
 
-Additional safeguards:
-- `assertNoSecrets()` in sync.mjs scans every output file for credential values and patterns before writing.
-- `validate.mjs` re-scans all output files for `app_secret`, `tenant_access_token`, `authorization`, `bearer` tokens, `client_secret`, `github_token`, internal `table_id` values, and the `app_token`.
-- `.env` files and API response caches are listed in `.gitignore` and explicitly forbidden in the validator.
-- No `table_id`, `app_token`, or Feishu internal identifiers appear in `index.html`.
+## 架构概览
+
+采用 **"单仓库多项目"** 架构：一个仓库、一个 Pages 站点、一套同步代码、一次安全扫描、一组 Actions、一个 catalog.json，支持多个独立的飞书 Base。
+
+```
+飞书 Base → sync-project.mjs → public/projects/<slug>/ → catalog.json → GitHub Pages
+```
+
+核心特性：
+- **故障隔离**：普通故障仅影响失败项目，安全故障中止整个部署
+- **遗留兼容**：`mirror_to_legacy_root` 保持旧 URL 可用
+- **缓存清除**：`build_id` + `?v=<build_id>` + `catalog-versioned/`
+
+详见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**。
+
+---
+
+## 安全
+
+公开数据采用三层防护：
+
+1. **视图级**：仅导出 `AI 公开导出` 视图
+2. **字段级**：显式字段白名单，禁止通配符，禁止敏感字段名
+3. **内容级**：写入时和部署前双重模式扫描
+
+安全故障（检测到凭证或敏感信息）会中止整个部署。
+
+详见 **[docs/SECURITY.md](docs/SECURITY.md)**。
+
+---
 
 ## GitHub Actions
 
-- **Schedule**: hourly at minute 17 (`cron: "17 * * * *"`)
-- **Manual trigger**: `workflow_dispatch`
-- **Permissions**: `contents: read`, `pages: write`, `id-token: write`
-- **All actions pinned** to full commit SHAs
-- **Pipeline**: checkout → syntax check → sync → validate → configure pages → upload artifact → deploy
-- **Failure stops deployment**: if sync or validate fails, the build job exits non-zero and the deploy job does not run.
+| 工作流 | 触发 | 说明 |
+|---|---|---|
+| `sync-hourly.yml` | cron `17 * * * *` | 每小时同步 hourly 层级项目 |
+| `sync-daily.yml` | cron `17 3 * * *` | 每日同步 daily 层级项目 |
+| `sync-manual.yml` | 手动 | 同步全部或指定项目，支持 force 和 dry-run |
+| `validate.yml` | PR / push | 轻量验证（无密钥访问） |
+
+所有 Actions 固定到完整 commit SHA，Dependabot 每周检查更新。
+
+流水线：checkout → Node 22 → npm ci → 语法检查 → 配置验证 → 同步 → 输出验证 → 安全扫描 → 部署
+
+---
+
+## 文档
+
+| 文档 | 说明 |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构概览 |
+| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 新项目接入指南 |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | 运维手册 |
+| [docs/SECURITY.md](docs/SECURITY.md) | 安全策略 |
+| [docs/MIGRATION_BASELINE.md](docs/MIGRATION_BASELINE.md) | 迁移前基线快照 |
+| [docs/MIGRATION_REPORT.md](docs/MIGRATION_REPORT.md) | 迁移报告 |

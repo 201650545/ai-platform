@@ -1,0 +1,137 @@
+# Project: Learning English
+# Migrated from config/export.json (schema_version 2)
+# This is the first project in the Data Hub.
+
+config_version: 1
+
+project:
+  slug: learning-english
+  title: "英语学习系统"
+  description: "词汇、文本、计划、日志和能力状态"
+  group: learning
+  tags:
+    - 英语
+    - 学习
+  enabled: true
+  status: active
+
+source:
+  provider: feishu-bitable
+  credential_profile: public-personal
+  base_key: learning-english
+  export_view_name: "AI 公开导出"
+
+table_discovery:
+  mode: view-name
+  include_tables: []
+  exclude_tables: []
+  require_export_view: true
+
+export:
+  chunk_size: 500
+  include_schema: true
+  include_summary: true
+  include_record_id: true
+  stable_sort: true
+
+privacy:
+  require_public_flag: false
+  public_field_name: "是否公开"
+  require_review_status: false
+  review_field_name: "公开审核状态"
+  approved_value: "已审核"
+  scan_free_text: true
+  scan_urls: true
+  fail_on_sensitive_content: true
+
+schedule:
+  tier: hourly
+
+compatibility:
+  # Mirror new data to legacy paths so existing consumers don't break.
+  # Old: /data/manifest.json, /data/schema.json, /data/<table-slug>/*
+  # New: /projects/learning-english/manifest.json, etc.
+  mirror_to_legacy_root: true
+  legacy_base_path: data
+
+tables:
+  - table_name: "文本库"
+    table_slug: text-library
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "文本标题"
+      - "英文原文"
+      - "来源类型"
+      - "来源详情"
+      - "难度等级"
+      - "适用词带"
+      - "文本总词数"
+      - "覆盖词数"
+      - "词汇覆盖率"
+      - "生词暴露数"
+      - "使用状态"
+      - "使用次数"
+      - "上次使用日期"
+      - "最早复用日期"
+      - "中文参考译文"
+      - "覆盖词汇列表"
+      - "关联词汇"
+      - "备注"
+
+  - table_name: "轻量学习记录"
+    table_slug: vocabulary
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "单词"
+      - "词性"
+      - "最简中文"
+      - "核心用法"
+      - "例句"
+      - "我的造句"
+      - "修改后句子"
+      - "考研搭配"
+      - "音标"
+      - "词根词缀助记"
+      - "派生词"
+      - "学习次数"
+      - "难度等级"
+      - "词表来源"
+      - "掌握状态"
+      - "记忆阶段"
+      - "正确次数"
+      - "上次测验"
+      - "下次复习"
+      - "掌握维度"
+      - "学习日志"
+      - "关联文本"
+
+  - table_name: "学习日志"
+    table_slug: learning-log
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "日期"
+      - "测验方向"
+      - "测验维度"
+      - "结果"
+      - "正确答案"
+      - "你的回答"
+      - "测验类型"
+      - "关联单词"
+      - "检测方式"
+
+  - table_name: "每日计划"
+    table_slug: daily-plan
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "日期"
+      - "复习词数"
+      - "单词列表"
+      - "完成状态"
+      - "新词数"
+      - "正确率"
+      - "计划类型"
+      - "单词列表(link)"
