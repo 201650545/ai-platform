@@ -10,6 +10,7 @@ import { getTenantAccessToken, listTables, listViews, listFields, listRecords, e
 import { assertNoSecrets, sha256 } from "../lib/security.mjs";
 import { selectRecord, buildSchemaEntry, escapeHtml } from "../lib/transform.mjs";
 import { writeJson, writeText, generateBuildId, buildProjectIndexHtml } from "../lib/output.mjs";
+import { loadSemanticConfig, validateSemanticConfig, buildSemanticJson } from "../lib/semantic.mjs";
 
 /**
  * Sync a single project.
@@ -248,12 +249,58 @@ export async function syncProject(slug, hubConfig, credentialProfiles, env, buil
   await writeJson(tempDir, "schema.json", schema, secretValues);
   console.log(`[${slug}] schema.json written`);
 
-  // Write summary.md
-  const summary = buildProjectSummary(projectConfig, manifest, schema);
-  await writeText(tempDir, "summary.md", summary, secretValues);
-  console.log(`[${slug}] summary.md written`);
+  // Copy summary.md from content source (human-maintained, not auto-generated)
+  const summarySourcePath = path.resolve(".", "content", "projects", slug, "summary.md");
+  try {
+    const summaryContent = await fs.readFile(summarySourcePath, "utf8");
+    assertNoSecrets(summaryContent, secretValues, `${slug} summary.md`);
+    await fs.writeFile(path.join(tempDir, "summary.md"), summaryContent, "utf8");
+    console.log(`[${slug}] summary.md copied from content source`);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      throw new Error(`[${slug}] content/projects/${slug}/summary.md 不存在 — 必须提供人工维护的项目说明`);
+    }
+    throw err;
+  }
 
-  // Write status.json
+  // Copy agent-guide.md from content source (human-maintained)
+  const agentGuideSourcePath = path.resolve(".", "content", "projects", slug, "agent-guide.md");
+  try {
+    const guideContent = await fs.readFile(agentGuideSourcePath, "utf8");
+    assertNoSecrets(guideContent, secretValues, `${slug} agent-guide.md`);
+    await fs.writeFile(path.join(tempDir, "agent-guide.md"), guideContent, "utf8");
+    console.log(`[${slug}] agent-guide.md copied from content source`);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      throw new Error(`[${slug}] content/projects/${slug}/agent-guide.md 不存在 — 必须提供人工维护的 AI 使用规则`);
+    }
+    throw err;
+  }
+
+  // Generate semantic.json from semantic config
+  const semanticConfig = await loadSemanticConfig(slug);
+  if (semanticConfig) {
+    // Validate semantic config against schema
+    const { errors: semErrors, warnings: semWarnings } = validateSemanticConfig(semanticConfig, schema, projectConfig);
+    if (semErrors.length > 0) {
+      throw new Error(`[${slug}] 语义配置校验失败：\n  ${semErrors.join("\n  ")}`);
+    }
+    for (const w of semWarnings) {
+      warnings.push(w);
+      console.log(`[${slug}] ⚠ ${w}`);
+    }
+
+    // Build and write semantic.json
+    const semanticJson = buildSemanticJson(semanticConfig, buildId, generatedAt);
+    await writeJson(tempDir, "semantic.json", semanticJson, secretValues);
+    console.log(`[${slug}] semantic.json written`);
+  } else {
+    console.warn(`[${slug}] ⚠ 无语义配置文件 config/semantics/${slug}.yaml — semantic.json 未生成`);
+    warnings.push(`无语义配置文件 config/semantics/${slug}.yaml`);
+  }
+
+  // Write status.json (unified format)
+  const totalRecords = manifest.tables.reduce((sum, t) => sum + t.record_count, 0);
   const status = {
     project_slug: slug,
     build_id: buildId,
@@ -261,8 +308,10 @@ export async function syncProject(slug, hubConfig, credentialProfiles, env, buil
     is_stale: false,
     last_attempt_at: generatedAt,
     last_success_at: generatedAt,
-    source_record_count: manifest.tables.reduce((sum, t) => sum + t.record_count, 0),
-    published_record_count: manifest.tables.reduce((sum, t) => sum + t.record_count, 0),
+    expected_update_interval: projectConfig.schedule?.tier || "hourly",
+    table_count: manifest.tables.length,
+    source_record_count: totalRecords,
+    published_record_count: totalRecords,
     warnings
   };
   await writeJson(tempDir, "status.json", status, secretValues);

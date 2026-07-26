@@ -13,6 +13,9 @@
     "validate": "node scripts/validate-config.mjs && node scripts/validate-output.mjs && node scripts/security-scan.mjs",
     "validate:config": "node scripts/validate-config.mjs",
     "validate:output": "node scripts/validate-output.mjs",
+    "validate:semantic": "node scripts/validate-semantic.mjs",
+    "validate:ai-docs": "node scripts/validate-ai-docs.mjs",
+    "validate:all": "node scripts/validate-output.mjs && node scripts/validate-semantic.mjs && node scripts/validate-ai-docs.mjs",
     "security:scan": "node scripts/security-scan.mjs",
     "project:add": "node scripts/add-project.mjs"
   },
