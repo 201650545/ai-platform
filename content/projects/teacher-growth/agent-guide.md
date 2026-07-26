@@ -3,7 +3,7 @@
 **适用项目:** `teacher-growth`（教师专业成长系统）
 **配套文件:** `summary.md`（项目语义摘要）、`public/projects/teacher-growth/` 下的 `manifest.json` / `schema.json` / `status.json` 及各表数据。
 
-本文件规定 AI 工具在使用教师专业成长项目数据时的任务边界、分析优先级、读取顺序、计划与错误分析规则、时间处理、数据不足处理、禁止推断与输出要求。所有规则均基于本项目真实的 5 张表与表间关联（详见 `summary.md`），不得超出 schema 与 manifest 描述的字段和关系范围。
+本文件规定 AI 工具在使用教师专业成长项目数据时的任务边界、分析优先级、读取顺序、计划与错误分析规则、时间处理、数据不足处理、禁止推断与输出要求。所有规则均基于本项目真实的 4 张公开导出表与表间关联（详见 `summary.md`），不得超出 schema 与 manifest 描述的字段和关系范围。
 
 ---
 
@@ -28,7 +28,7 @@
 3. **学习效果因果推断**：本项目记录的是学习行为与掌握状态，但不能从相关性推断因果性（如"学习时长更长导致掌握度更高"），仅可描述统计观察。
 4. **写回飞书源数据**：本数据为只读公开导出，AI 不得声称已修改飞书源表；任何"建议回填"只能以建议形式输出，由用户在飞书中执行。
 5. **个人身份或隐私推断**：公开数据已经过 PII 与敏感信息扫描，AI 不得从数据中尝试还原或推断任何个人身份信息。
-6. **以 `design-notes` 作为业务数据**：`design-notes`（📋设计说明）为项目设计层面的章节性参考文档，**禁止作为业务数据**参与任何统计、归因或分析。
+6. **以 `design-notes` 作为业务数据**：`design-notes`（📋设计说明）因安全原因已禁用导出，**禁止作为业务数据**参与任何统计、归因或分析。
 
 ---
 
@@ -50,7 +50,7 @@
 首次接入本项目时，按以下顺序读取，逐步建立上下文（与 `summary.md` 的"推荐读取顺序"一致）：
 
 1. `public/projects/teacher-growth/status.json` — 先看 `sync_status` / `is_stale` / `last_success_at`，stale 时须在输出中声明数据可能过期。
-2. `public/projects/teacher-growth/manifest.json` — 确认 5 张表、记录数与校验和。
+2. `public/projects/teacher-growth/manifest.json` — 确认 4 张表、记录数与校验和。
 3. `public/projects/teacher-growth/schema.json` — 建立字段类型与关联模型，注意选择字段的 `options` 取值。
 4. `content/projects/teacher-growth/summary.md` — 建立业务语义与表关系认知。
 5. 本文件（`agent-guide.md`）— 加载分析规则与禁止推断。
@@ -60,7 +60,7 @@
    - **日志分析**：`study-logs`（按 `学习日期` 排序）→ `knowledge-points`（经 `知识点` 语义匹配）→ `knowledge-categories`（按分类聚合）。
    - **知识体系浏览**：`knowledge-categories`（按一/二/三级分类浏览）→ `knowledge-points`（经 `关联知识点`）→ `self-test-questions`（经 `关联知识点`）。
 
-> `design-notes` 仅在用户明确要求查看设计说明时读取，且不得用于任何业务分析。
+> `design-notes` 已禁用导出，不在公开数据中。仅在用户明确要求查看设计说明时说明该表不可用。
 
 ---
 
@@ -128,7 +128,7 @@
 
 AI 在使用本项目数据时，**禁止**做出以下推断（与 `summary.md` 的"不应做出的推断"一致）：
 
-1. **禁止以 `design-notes` 表内容作为业务数据**：该表为项目设计层面的章节性参考文档，不得用于知识点统计、掌握情况分析或学习进展推断。
+1. **禁止以 `design-notes` 表内容作为业务数据**：该表因安全原因已禁用导出，不得用于知识点统计、掌握情况分析或学习进展推断。
 2. **禁止假定所有知识点都有学习日志记录**：`study-logs` 仅记录已发生的学习行为，未记录的知识点不能推断为"未学习"，只能说明"暂无学习日志记录"。
 3. **禁止把 `掌握度评分` 为空等同于"未掌握"**：留空仅表示"尚未评分"，不代表 `掌握状态` 为"未开始"或掌握度低。
 4. **禁止跨项目合并分析**：不得将本项目数据与 `learning-english` / `civil-service-exam` / `teacher-cert-exam` 等其他项目数据混合得出结论，本项目与其他项目无业务关联。

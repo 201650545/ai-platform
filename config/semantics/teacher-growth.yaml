@@ -57,6 +57,7 @@ tables:
     primary_display_field: "章节"
     date_field: null
     status_field: null
+    enabled: false  # 禁用导出：内容含疑似凭证值，触发安全扫描
 
   study-logs:
     role: event_log

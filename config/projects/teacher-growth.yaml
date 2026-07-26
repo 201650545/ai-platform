@@ -91,7 +91,7 @@ tables:
   - table_name: "📋设计说明"
     table_slug: design-notes
     view_name: "AI 公开导出"
-    enabled: true
+    enabled: false  # 禁用：内容含疑似凭证值，触发安全扫描；该表为参考文档，不参与业务分析
     fields:
       - "章节"
       - "内容"
