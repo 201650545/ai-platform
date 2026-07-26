@@ -7,10 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "node --check scripts/sync-hub.mjs && node --check scripts/sync-project.mjs && node --check scripts/validate-config.mjs && node --check scripts/validate-output.mjs && node --check scripts/security-scan.mjs && node --check scripts/hydrate-existing-project.mjs && node --check scripts/add-project.mjs",
+    "check": "node --check scripts/sync-hub.mjs && node --check scripts/sync-project.mjs && node --check scripts/validate-config.mjs && node --check scripts/validate-output.mjs && node --check scripts/validate-semantic.mjs && node --check scripts/validate-ai-docs.mjs && node --check scripts/security-scan.mjs && node --check scripts/hydrate-existing-project.mjs && node --check scripts/add-project.mjs && node --check lib/semantic.mjs && node --check lib/output.mjs",
     "sync": "node scripts/sync-hub.mjs",
     "sync:project": "node scripts/sync-project.mjs",
-    "validate": "node scripts/validate-config.mjs && node scripts/validate-output.mjs && node scripts/security-scan.mjs",
+    "validate": "node scripts/validate-config.mjs && node scripts/validate-output.mjs && node scripts/validate-semantic.mjs && node scripts/validate-ai-docs.mjs && node scripts/security-scan.mjs",
     "validate:config": "node scripts/validate-config.mjs",
     "validate:output": "node scripts/validate-output.mjs",
     "validate:semantic": "node scripts/validate-semantic.mjs",
