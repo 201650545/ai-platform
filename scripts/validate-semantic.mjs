@@ -106,7 +106,7 @@ async function main() {
     const routing = JSON.parse(routingText);
 
     // Check required intents exist
-    const requiredIntents = ["list_projects", "project_health", "study_planning", "english_review", "civil_service_error_analysis"];
+    const requiredIntents = ["list_projects", "project_health", "study_planning", "english_review", "civil_service_error_analysis", "teacher_cert_review"];
     for (const intent of requiredIntents) {
       if (!routing.intents?.[intent]) {
         console.error(`  ✗ routing.json 缺少 intent: ${intent}`);
@@ -117,12 +117,15 @@ async function main() {
     // Validate routing logic
     const studyPlanning = routing.intents?.study_planning;
     if (studyPlanning) {
-      const expected = ["civil-service-exam", "learning-english"];
-      if (JSON.stringify(studyPlanning.candidate_projects) !== JSON.stringify(expected)) {
-        console.error(`  ✗ study_planning 候选项目不正确：${JSON.stringify(studyPlanning.candidate_projects)}`);
+      const expected = ["civil-service-exam", "learning-english", "teacher-cert-exam"];
+      const candidate = studyPlanning.candidate_projects;
+      // Check that all three projects are included (order may vary)
+      const hasAll = expected.every(s => candidate?.includes(s));
+      if (!hasAll) {
+        console.error(`  ✗ study_planning 候选项目不正确：${JSON.stringify(candidate)}（应包含 ${JSON.stringify(expected)}）`);
         totalErrors++;
       } else {
-        console.log(`  ✓ study_planning 路由正确（两个项目）`);
+        console.log(`  ✓ study_planning 路由正确（${candidate.length} 个项目）`);
       }
     }
 
