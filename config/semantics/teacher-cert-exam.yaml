@@ -1,0 +1,197 @@
+# Semantic configuration for the teacher-cert-exam project.
+# Maps tables and fields to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: teacher-cert-exam
+  domains:
+    - exam
+    - learning
+  entity_types:
+    - knowledge
+    - content
+    - metric
+    - reference
+  capabilities:
+    - study_planning
+    - error_analysis
+    - review_prioritization
+    - progress_analysis
+    - exam_analysis
+  supported_queries:
+    - "制定教资学习计划"
+    - "分析教资错题"
+    - "查看考点掌握情况"
+    - "分析真题题型分布"
+    - "查看题型答题框架"
+
+tables:
+  knowledge-modules:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - progress_analysis
+    primary_display_field: "模块名称"
+    date_field: null
+    status_field: null
+
+  exam-points:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - progress_analysis
+      - error_analysis
+    primary_display_field: "考点名称"
+    date_field: "下次复习日期"
+    status_field: "掌握程度"
+
+  question-templates:
+    role: reference
+    entity_type: reference
+    preferred_for:
+      - exam_analysis
+      - method_guidance
+    primary_display_field: "题型名称"
+    date_field: null
+    status_field: null
+
+  error-notebook:
+    role: error_log
+    entity_type: learning_event
+    preferred_for:
+      - error_analysis
+      - recent_activity
+    primary_display_field: "错题标题"
+    date_field: "错题日期"
+    status_field: "是否已纠正"
+
+  past-exam-questions:
+    role: content
+    entity_type: content
+    preferred_for:
+      - exam_analysis
+      - error_analysis
+    primary_display_field: "题目内容"
+    date_field: null
+    status_field: "难度"
+
+fields:
+  knowledge-modules:
+    "模块名称":
+      semantic_type: entity_identity_title
+    "模块说明":
+      semantic_type: content_text
+    "所属科目":
+      semantic_type: knowledge_topic
+    "知识树":
+      semantic_type: knowledge_topic
+    "关联考点":
+      semantic_type: relation
+    "关联真题":
+      semantic_type: relation
+
+  exam-points:
+    "考点名称":
+      semantic_type: entity_identity_title
+    "考点编号":
+      semantic_type: entity_identity_title
+    "知识内容":
+      semantic_type: content_text
+    "所属科目":
+      semantic_type: knowledge_topic
+    "所属模块":
+      semantic_type: relation
+    "重要性":
+      semantic_type: task_priority
+    "颜色标注":
+      semantic_type: status
+    "学习状态":
+      semantic_type: status
+    "掌握程度":
+      semantic_type: mastery_level
+    "考察频率":
+      semantic_type: score
+    "验证方式":
+      semantic_type: knowledge_topic
+    "连续正确次数":
+      semantic_type: attempt_count
+    "上次复习日期":
+      semantic_type: event_date
+    "下次复习日期":
+      semantic_type: review_due_at
+    "最近检测日期":
+      semantic_type: event_date
+    "最近检测结果":
+      semantic_type: outcome
+    "例词例句":
+      semantic_type: content_text
+    "知识树路径":
+      semantic_type: knowledge_topic
+    "关联真题":
+      semantic_type: relation
+
+  question-templates:
+    "题型名称":
+      semantic_type: entity_identity_title
+    "题目描述":
+      semantic_type: content_text
+    "所属科目":
+      semantic_type: knowledge_topic
+    "答题框架":
+      semantic_type: content_text
+    "典型例题":
+      semantic_type: content_text
+    "评分要点":
+      semantic_type: content_text
+    "关联模块":
+      semantic_type: relation
+
+  error-notebook:
+    "错题标题":
+      semantic_type: entity_identity_title
+    "题目内容":
+      semantic_type: content_text
+    "我的答案":
+      semantic_type: content_text
+    "正确答案":
+      semantic_type: content_text
+    "错因分析":
+      semantic_type: error_type
+    "错题日期":
+      semantic_type: event_date
+    "是否已纠正":
+      semantic_type: status
+    "所属科目":
+      semantic_type: knowledge_topic
+    "关联考点":
+      semantic_type: relation
+
+  past-exam-questions:
+    "题号":
+      semantic_type: entity_identity_title
+    "题目内容":
+      semantic_type: content_text
+    "选项":
+      semantic_type: content_text
+    "正确答案":
+      semantic_type: content_text
+    "答案解析":
+      semantic_type: content_text
+    "题型":
+      semantic_type: knowledge_topic
+    "难度":
+      semantic_type: difficulty
+    "考次":
+      semantic_type: event_date
+    "分值":
+      semantic_type: score
+    "所属科目":
+      semantic_type: knowledge_topic
+    "关联考点":
+      semantic_type: relation
+    "关联模块":
+      semantic_type: relation

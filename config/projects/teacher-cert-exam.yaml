@@ -1,0 +1,130 @@
+# Project: Teacher Certification Exam Preparation
+# Third project in the Data Hub — teacher certification knowledge and exam point management.
+
+config_version: 1
+
+project:
+  slug: teacher-cert-exam
+  title: "教资备考系统"
+  description: "知识模块、考点信息、题型模板、错题本、真题库"
+  group: exam
+  tags:
+    - 教资
+    - 备考
+  enabled: true
+  status: active
+
+source:
+  provider: feishu-bitable
+  credential_profile: public-personal
+  base_key: teacher-cert-exam
+  export_view_name: "AI 公开导出"
+
+table_discovery:
+  mode: view-name
+  include_tables: []
+  exclude_tables: []
+  require_export_view: true
+
+export:
+  chunk_size: 500
+  include_schema: true
+  include_summary: true
+  include_record_id: true
+  stable_sort: true
+
+privacy:
+  require_public_flag: false
+  scan_free_text: true
+  scan_urls: true
+  fail_on_sensitive_content: true
+
+schedule:
+  tier: hourly
+
+compatibility:
+  mirror_to_legacy_root: false
+
+tables:
+  - table_name: "知识模块表"
+    table_slug: knowledge-modules
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "模块名称"
+      - "模块说明"
+      - "所属科目"
+      - "知识树"
+      - "关联考点"
+      - "关联真题"
+
+  - table_name: "考点信息表"
+    table_slug: exam-points
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "考点名称"
+      - "考点编号"
+      - "知识内容"
+      - "所属科目"
+      - "所属模块"
+      - "重要性"
+      - "颜色标注"
+      - "学习状态"
+      - "掌握程度"
+      - "考察频率"
+      - "验证方式"
+      - "连续正确次数"
+      - "上次复习日期"
+      - "下次复习日期"
+      - "最近检测日期"
+      - "最近检测结果"
+      - "例词例句"
+      - "知识树路径"
+      - "关联真题"
+
+  - table_name: "题型模板表"
+    table_slug: question-templates
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "题型名称"
+      - "题目描述"
+      - "所属科目"
+      - "答题框架"
+      - "典型例题"
+      - "评分要点"
+      - "关联模块"
+
+  - table_name: "错题本"
+    table_slug: error-notebook
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "错题标题"
+      - "题目内容"
+      - "我的答案"
+      - "正确答案"
+      - "错因分析"
+      - "错题日期"
+      - "是否已纠正"
+      - "所属科目"
+      - "关联考点"
+
+  - table_name: "真题库"
+    table_slug: past-exam-questions
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "题号"
+      - "题目内容"
+      - "选项"
+      - "正确答案"
+      - "答案解析"
+      - "题型"
+      - "难度"
+      - "考次"
+      - "分值"
+      - "所属科目"
+      - "关联考点"
+      - "关联模块"

@@ -53,6 +53,8 @@ intents:
       - competency-state
       - knowledge-points
       - vocabulary
+      - exam-points
+      - knowledge-modules
 
   english_review:
     description: "分析英语复习情况"
@@ -124,6 +126,58 @@ intents:
     recommended_tables:
       - knowledge-points
       - exam-patterns
+
+  teacher_cert_review:
+    description: "查看教资考点掌握情况"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/summary.md"
+      - "projects/teacher-cert-exam/agent-guide.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - exam-points
+      - knowledge-modules
+
+  teacher_cert_exam_analysis:
+    description: "分析教资真题题型分布"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/semantic.json"
+      - "projects/teacher-cert-exam/schema.json"
+    recommended_tables:
+      - past-exam-questions
+      - question-templates
+      - exam-points
+
+  teacher_cert_error_analysis:
+    description: "分析教资错题"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/agent-guide.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - error-notebook
+      - exam-points
+      - past-exam-questions
+
+  teacher_cert_question_templates:
+    description: "查看教资题型答题框架"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/summary.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - question-templates
+      - knowledge-modules
+      - past-exam-questions
 
 # Reading depth guidelines
 reading_depth:
