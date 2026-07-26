@@ -7,8 +7,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { loadHubConfig } from "../lib/config.mjs";
-import { sha256 } from "../lib/security.mjs";
+import { sha256, SECRET_PATTERNS, scanTokenPrefixes, scanHighEntropy } from "../lib/security.mjs";
 import { walkDir } from "../lib/output.mjs";
+
+/**
+ * Internal Feishu identifier patterns (mirrored from security-scan.mjs).
+ * - table_id: Feishu table IDs start with "tbl" followed by alphanumeric chars.
+ * - app_token: Feishu base/app tokens leaked as JSON key-value pairs.
+ */
+const FEISHU_TABLE_ID_PATTERN = /\btbl[A-Za-z0-9]{6,}\b/g;
+const FEISHU_APP_TOKEN_PATTERN = /"app_token"\s*:\s*"[^"]{15,}"/i;
 
 /**
  * Read and parse a JSON file.
@@ -101,7 +109,11 @@ export async function validateOutput(rootDir) {
   // 3. Validate legacy compatibility paths (data/manifest.json, data/schema.json) if they exist
   await validateLegacyPaths(outputDir, errors, stats);
 
-  // 4. Count total files in output directory using walkDir
+  // 4. Security scan new AI semantic layer files (AI-README.md, routing.json,
+  //    semantic.json, agent-guide.md) for leaked secrets and sensitive content
+  await validateSemanticFilesSecurity(outputDir, catalog, projectsDir, errors, stats);
+
+  // 5. Count total files in output directory using walkDir
   try {
     const allFiles = await walkDir(outputDir);
     stats.totalFiles = allFiles.length;
@@ -347,6 +359,114 @@ async function validateLegacyPaths(outputDir, errors, stats) {
       errors.push(`遗留路径 data/schema.json: ${error.message}`);
       console.error(`[失败] 遗留路径 data/schema.json 验证失败：${error.message}`);
     }
+  }
+}
+
+/**
+ * Security scan new AI semantic layer files (AI-README.md, routing.json,
+ * semantic.json, agent-guide.md) for leaked secrets and sensitive content.
+ *
+ * Scans hub-level files (AI-README.md, routing.json) and project-level files
+ * (semantic.json, agent-guide.md) for each project in the catalog. Secret
+ * patterns, token prefixes, and internal Feishu identifiers are FATAL errors.
+ * High-entropy strings are logged as warnings but do not fail validation
+ * (to avoid false positives in prose-heavy markdown).
+ *
+ * @param {string} outputDir - Root output directory.
+ * @param {object} catalog - Parsed catalog.json object.
+ * @param {string} projectsDir - Projects subdirectory name.
+ * @param {string[]} errors - Shared errors array to push to.
+ * @param {object} stats - Shared stats object to update.
+ */
+async function validateSemanticFilesSecurity(outputDir, catalog, projectsDir, errors, stats) {
+  console.log("\n[语义层文件安全扫描]");
+
+  // Hub-level semantic files to scan
+  const hubFiles = ["AI-README.md", "routing.json"];
+  for (const name of hubFiles) {
+    const filePath = path.join(outputDir, name);
+    if (!(await fileExists(filePath))) continue;
+    await scanSemanticFile(filePath, name, errors, stats);
+  }
+
+  // Project-level semantic files to scan
+  for (const entry of catalog.projects || []) {
+    const slug = entry.slug;
+    if (!slug) continue;
+    const projectDir = path.join(outputDir, projectsDir, slug);
+    const projectFiles = ["semantic.json", "agent-guide.md"];
+    for (const name of projectFiles) {
+      const filePath = path.join(projectDir, name);
+      if (!(await fileExists(filePath))) continue;
+      await scanSemanticFile(filePath, `${slug}/${name}`, errors, stats);
+    }
+  }
+}
+
+/**
+ * Scan a single semantic layer file for security issues.
+ * Secret patterns, token prefixes, and internal Feishu identifiers are FATAL.
+ * High-entropy strings are warnings (logged, not added to errors).
+ *
+ * @param {string} filePath - Absolute path to the file.
+ * @param {string} relativeName - Display name for error messages (e.g. "slug/semantic.json").
+ * @param {string[]} errors - Shared errors array to push fatal issues to.
+ * @param {object} stats - Shared stats object to update.
+ */
+async function scanSemanticFile(filePath, relativeName, errors, stats) {
+  let text;
+  try {
+    text = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    errors.push(`${relativeName}: 读取失败 — ${error.message}`);
+    console.error(`[失败] ${relativeName}: 读取失败 — ${error.message}`);
+    return;
+  }
+
+  stats.filesChecked++;
+  let hasFatal = false;
+
+  // Check for secret patterns (FATAL)
+  for (const pattern of SECRET_PATTERNS) {
+    if (pattern.test(text)) {
+      errors.push(`${relativeName}: 敏感信息模式 (${pattern.source})`);
+      console.error(`[失败] ${relativeName}: 敏感信息模式 (${pattern.source})`);
+      hasFatal = true;
+    }
+  }
+
+  // Check for token prefixes (FATAL)
+  const tokenFindings = scanTokenPrefixes(text);
+  if (tokenFindings.length > 0) {
+    errors.push(`${relativeName}: Token 前缀 (${tokenFindings.join(", ")})`);
+    console.error(`[失败] ${relativeName}: Token 前缀 (${tokenFindings.join(", ")})`);
+    hasFatal = true;
+  }
+
+  // Check for internal Feishu table_id identifiers (FATAL)
+  const tableIdMatches = text.match(FEISHU_TABLE_ID_PATTERN);
+  if (tableIdMatches) {
+    const unique = [...new Set(tableIdMatches)];
+    errors.push(`${relativeName}: 内部 table_id (${unique.join(", ")})`);
+    console.error(`[失败] ${relativeName}: 内部 table_id (${unique.join(", ")})`);
+    hasFatal = true;
+  }
+
+  // Check for internal Feishu app_token (FATAL)
+  if (FEISHU_APP_TOKEN_PATTERN.test(text)) {
+    errors.push(`${relativeName}: 内部 app_token`);
+    console.error(`[失败] ${relativeName}: 内部 app_token`);
+    hasFatal = true;
+  }
+
+  // Check for high-entropy strings (WARNING — logged only, not fatal)
+  const entropyFindings = scanHighEntropy(text);
+  if (entropyFindings.length > 0) {
+    console.log(`[警告] ${relativeName}: 高熵字符串 (${entropyFindings.length} 处)`);
+  }
+
+  if (!hasFatal) {
+    console.log(`[通过] ${relativeName} 安全扫描通过`);
   }
 }
 

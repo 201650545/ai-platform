@@ -1,0 +1,317 @@
+# Semantic configuration for the civil-service-exam project.
+# Maps tables and fields to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: civil-service-exam
+  domains:
+    - exam
+    - learning
+  entity_types:
+    - task
+    - knowledge
+    - content
+    - metric
+    - reference
+  capabilities:
+    - study_planning
+    - error_analysis
+    - exam_analysis
+    - review_prioritization
+    - progress_analysis
+  supported_queries:
+    - "制定公考学习计划"
+    - "分析公考错题"
+    - "查看知识点掌握情况"
+    - "分析真题命题规律"
+    - "查看目标岗位信息"
+
+tables:
+  target-positions:
+    role: reference
+    entity_type: reference
+    preferred_for:
+      - goal_setting
+    primary_display_field: "岗位名称"
+    date_field: null
+    status_field: null
+
+  knowledge-points:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - progress_analysis
+    primary_display_field: "知识点"
+    date_field: "下次复习"
+    status_field: "掌握状态"
+
+  daily-study-plan:
+    role: plan
+    entity_type: task_collection
+    preferred_for:
+      - daily_planning
+    primary_display_field: "日期"
+    date_field: "日期"
+    status_field: "完成状态"
+
+  practice-records:
+    role: event_log
+    entity_type: learning_event
+    preferred_for:
+      - error_analysis
+      - recent_activity
+    primary_display_field: "题目内容"
+    date_field: "日期"
+    status_field: "结果"
+
+  past-exam-questions:
+    role: content
+    entity_type: content
+    preferred_for:
+      - exam_analysis
+      - error_analysis
+    primary_display_field: "题目内容"
+    date_field: null
+    status_field: "结果"
+
+  experience-methods:
+    role: reference
+    entity_type: reference
+    preferred_for:
+      - content_recommendation
+      - method_guidance
+    primary_display_field: "经验标题"
+    date_field: null
+    status_field: "实用程度"
+
+  exam-analysis:
+    role: analysis
+    entity_type: content
+    preferred_for:
+      - exam_analysis
+      - method_guidance
+    primary_display_field: "题目摘要"
+    date_field: null
+    status_field: "难度等级"
+
+  common-traps:
+    role: reference
+    entity_type: reference
+    preferred_for:
+      - error_analysis
+      - review_prioritization
+    primary_display_field: "陷阱名称"
+    date_field: null
+    status_field: null
+
+  exam-patterns:
+    role: analysis
+    entity_type: metric
+    preferred_for:
+      - exam_analysis
+      - review_prioritization
+    primary_display_field: "考点名称"
+    date_field: null
+    status_field: "考查频率"
+
+fields:
+  knowledge-points:
+    "知识点":
+      semantic_type: entity_identity_title
+    "所属科目":
+      semantic_type: knowledge_topic
+    "子模块":
+      semantic_type: knowledge_topic
+    "掌握状态":
+      semantic_type: mastery_level
+    "记忆阶段":
+      semantic_type: status
+    "正确次数":
+      semantic_type: attempt_count
+    "学习次数":
+      semantic_type: attempt_count
+    "上次复习":
+      semantic_type: event_date
+    "下次复习":
+      semantic_type: review_due_at
+    "重要程度":
+      semantic_type: task_priority
+    "关联真题":
+      semantic_type: relation
+    "笔记":
+      semantic_type: content_text
+
+  practice-records:
+    "日期":
+      semantic_type: event_date
+    "结果":
+      semantic_type: outcome
+    "题型":
+      semantic_type: knowledge_topic
+    "题源":
+      semantic_type: source_reference
+    "正确答案":
+      semantic_type: content_text
+    "你的答案":
+      semantic_type: content_text
+    "用时(秒)":
+      semantic_type: duration_minutes
+    "关联知识点":
+      semantic_type: relation
+    "错因分析":
+      semantic_type: error_type
+    "备注":
+      semantic_type: content_text
+
+  past-exam-questions:
+    "ID":
+      semantic_type: entity_identity_title
+    "年份":
+      semantic_type: event_date
+    "试卷类型":
+      semantic_type: knowledge_topic
+    "所属科目":
+      semantic_type: knowledge_topic
+    "题型":
+      semantic_type: knowledge_topic
+    "题源":
+      semantic_type: source_reference
+    "题目内容":
+      semantic_type: content_text
+    "正确答案":
+      semantic_type: content_text
+    "你的答案":
+      semantic_type: content_text
+    "结果":
+      semantic_type: outcome
+    "用时(秒)":
+      semantic_type: duration_minutes
+    "关联知识点":
+      semantic_type: relation
+    "错因分析":
+      semantic_type: error_type
+    "备注":
+      semantic_type: content_text
+
+  daily-study-plan:
+    "日期":
+      semantic_type: planned_date
+    "完成状态":
+      semantic_type: task_status
+    "计划时长(分钟)":
+      semantic_type: duration_minutes
+    "实际时长(分钟)":
+      semantic_type: duration_minutes
+    "学习科目":
+      semantic_type: knowledge_topic
+    "正确率":
+      semantic_type: accuracy
+    "学习内容":
+      semantic_type: content_text
+    "备注":
+      semantic_type: content_text
+
+  target-positions:
+    "岗位名称":
+      semantic_type: entity_identity_title
+    "招录人数":
+      semantic_type: score
+    "考试类型":
+      semantic_type: knowledge_topic
+    "竞争比":
+      semantic_type: score
+    "历年分数线":
+      semantic_type: score
+    "工作地点":
+      semantic_type: content_text
+    "学历要求":
+      semantic_type: content_text
+    "专业要求":
+      semantic_type: content_text
+    "基层经历":
+      semantic_type: content_text
+    "招录机关":
+      semantic_type: content_text
+    "备注":
+      semantic_type: content_text
+
+  experience-methods:
+    "ID":
+      semantic_type: entity_identity_title
+    "经验标题":
+      semantic_type: entity_identity_title
+    "核心内容":
+      semantic_type: content_text
+    "分类":
+      semantic_type: knowledge_topic
+    "适用场景":
+      semantic_type: content_text
+    "来源":
+      semantic_type: source_reference
+    "实用程度":
+      semantic_type: score
+    "标签":
+      semantic_type: knowledge_topic
+    "备注":
+      semantic_type: content_text
+
+  exam-analysis:
+    "题目摘要":
+      semantic_type: content_text
+    "题型":
+      semantic_type: knowledge_topic
+    "难度等级":
+      semantic_type: difficulty
+    "出题意图":
+      semantic_type: content_text
+    "解题思维路径":
+      semantic_type: content_text
+    "常见错误分析":
+      semantic_type: error_type
+    "变式训练方向":
+      semantic_type: content_text
+    "思维层次":
+      semantic_type: knowledge_topic
+    "考查知识点":
+      semantic_type: knowledge_topic
+    "关联真题":
+      semantic_type: relation
+
+  common-traps:
+    "陷阱名称":
+      semantic_type: entity_identity_title
+    "陷阱类型":
+      semantic_type: knowledge_topic
+    "陷阱描述":
+      semantic_type: content_text
+    "错误思路":
+      semantic_type: content_text
+    "正确思路":
+      semantic_type: content_text
+    "防范口诀":
+      semantic_type: content_text
+    "所属模块":
+      semantic_type: knowledge_topic
+    "典型真题":
+      semantic_type: relation
+
+  exam-patterns:
+    "考点名称":
+      semantic_type: entity_identity_title
+    "所属模块":
+      semantic_type: knowledge_topic
+    "考查频率":
+      semantic_type: score
+    "近5年出现频次":
+      semantic_type: score
+    "常见出题方式":
+      semantic_type: content_text
+    "命题趋势分析":
+      semantic_type: content_text
+    "复习优先级":
+      semantic_type: task_priority
+    "关联知识点":
+      semantic_type: relation

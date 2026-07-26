@@ -48,3 +48,9 @@ jobs:
 
       - name: Validate configuration
         run: npm run validate:config
+
+      - name: Validate semantic configs
+        run: node scripts/validate-semantic.mjs
+
+      - name: Validate AI documentation
+        run: node scripts/validate-ai-docs.mjs
