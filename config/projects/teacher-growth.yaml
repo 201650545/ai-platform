@@ -1,0 +1,128 @@
+# Project: Teacher Professional Growth System
+# Fourth project in the Data Hub — teacher professional growth driven by Feynman learning method.
+
+config_version: 1
+
+project:
+  slug: teacher-growth
+  title: "教师专业成长系统"
+  description: "知识体系、学习日志、自测题库（费曼学习法驱动）"
+  group: learning
+  tags:
+    - 教师成长
+    - 知识管理
+  enabled: true
+  status: active
+
+source:
+  provider: feishu-bitable
+  credential_profile: public-personal
+  base_key: teacher-growth
+  export_view_name: "AI 公开导出"
+
+table_discovery:
+  mode: view-name
+  include_tables: []
+  exclude_tables: []
+  require_export_view: true
+
+export:
+  chunk_size: 500
+  include_schema: true
+  include_summary: true
+  include_record_id: true
+  stable_sort: true
+
+privacy:
+  require_public_flag: false
+  scan_free_text: true
+  scan_urls: true
+  fail_on_sensitive_content: true
+
+schedule:
+  tier: hourly
+
+compatibility:
+  mirror_to_legacy_root: false
+
+tables:
+  - table_name: "知识点明细表"
+    table_slug: knowledge-points
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "条目名称"
+      - "知识要点"
+      - "一级分类"
+      - "二级分类"
+      - "三级分类"
+      - "重要程度"
+      - "学习策略"
+      - "掌握状态"
+      - "掌握度评分"
+      - "复习次数"
+      - "上次学习日期"
+      - "下次复习日期"
+      - "适用学段"
+      - "学习资源"
+      - "费曼解释记录"
+      - "所属分类"
+      - "备注"
+
+  - table_name: "知识分类目录"
+    table_slug: knowledge-categories
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "掌握状态"
+      - "适用学段"
+      - "学科分类"
+      - "备注"
+      - "关联知识点"
+      - "二级分类"
+      - "学习策略"
+      - "知识要点"
+      - "条目数量"
+      - "一级分类"
+      - "重要程度"
+      - "三级分类"
+      - "学习资源"
+
+  - table_name: "📋设计说明"
+    table_slug: design-notes
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "章节"
+      - "内容"
+
+  - table_name: "学习日志"
+    table_slug: study-logs
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "费曼解释我的话"
+      - "自测结果"
+      - "卡壳点"
+      - "学习日期"
+      - "知识点"
+      - "学习时长分钟"
+      - "掌握度评分"
+      - "学习方式"
+      - "学习心得"
+      - "学习类型"
+      - "下一步行动"
+
+  - table_name: "自测题库"
+    table_slug: self-test-questions
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "评分标准"
+      - "参考答案"
+      - "来源"
+      - "一级分类"
+      - "题型"
+      - "关联知识点"
+      - "题目"
+      - "难度"

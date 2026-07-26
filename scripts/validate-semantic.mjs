@@ -106,7 +106,7 @@ async function main() {
     const routing = JSON.parse(routingText);
 
     // Check required intents exist
-    const requiredIntents = ["list_projects", "project_health", "study_planning", "english_review", "civil_service_error_analysis", "teacher_cert_review"];
+    const requiredIntents = ["list_projects", "project_health", "study_planning", "english_review", "civil_service_error_analysis", "teacher_cert_review", "teacher_growth_review"];
     for (const intent of requiredIntents) {
       if (!routing.intents?.[intent]) {
         console.error(`  ✗ routing.json 缺少 intent: ${intent}`);
@@ -117,7 +117,7 @@ async function main() {
     // Validate routing logic
     const studyPlanning = routing.intents?.study_planning;
     if (studyPlanning) {
-      const expected = ["civil-service-exam", "learning-english", "teacher-cert-exam"];
+      const expected = ["civil-service-exam", "learning-english", "teacher-cert-exam", "teacher-growth"];
       const candidate = studyPlanning.candidate_projects;
       // Check that all three projects are included (order may vary)
       const hasAll = expected.every(s => candidate?.includes(s));

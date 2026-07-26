@@ -55,6 +55,10 @@ intents:
       - vocabulary
       - exam-points
       - knowledge-modules
+      - knowledge-points
+      - knowledge-categories
+      - study-logs
+      - self-test-questions
 
   english_review:
     description: "分析英语复习情况"
@@ -178,6 +182,44 @@ intents:
       - question-templates
       - knowledge-modules
       - past-exam-questions
+
+  teacher_growth_review:
+    description: "查看教师成长知识点掌握情况"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/summary.md"
+      - "projects/teacher-growth/agent-guide.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - knowledge-points
+      - knowledge-categories
+
+  teacher_growth_study_analysis:
+    description: "分析教师成长学习日志"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/agent-guide.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - study-logs
+      - knowledge-points
+
+  teacher_growth_self_test:
+    description: "推荐教师成长自测题目"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/summary.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - self-test-questions
+      - knowledge-points
+      - knowledge-categories
 
 # Reading depth guidelines
 reading_depth:
