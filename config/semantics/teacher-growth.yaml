@@ -50,15 +50,6 @@ tables:
     date_field: null
     status_field: "掌握状态"
 
-  design-notes:
-    role: reference
-    entity_type: reference
-    preferred_for: []
-    primary_display_field: "章节"
-    date_field: null
-    status_field: null
-    enabled: false  # 禁用导出：内容含疑似凭证值，触发安全扫描
-
   study-logs:
     role: event_log
     entity_type: learning_event
@@ -143,12 +134,6 @@ fields:
       semantic_type: knowledge_topic
     "学习资源":
       semantic_type: source_reference
-
-  design-notes:
-    "章节":
-      semantic_type: entity_identity_title
-    "内容":
-      semantic_type: content_text
 
   study-logs:
     "费曼解释我的话":
