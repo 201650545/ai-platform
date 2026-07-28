@@ -84,7 +84,7 @@ tables:
     status_field: "难度"
 
   study-answers:
-    role: learning_event
+    role: event_log
     entity_type: learning_event
     preferred_for:
       - progress_analysis
@@ -95,7 +95,7 @@ tables:
     status_field: "作答结果"
 
   study-sessions:
-    role: learning_session
+    role: analysis
     entity_type: learning_event
     preferred_for:
       - progress_analysis
