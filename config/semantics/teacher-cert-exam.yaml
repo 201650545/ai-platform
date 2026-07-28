@@ -14,18 +14,22 @@ project:
     - content
     - metric
     - reference
+    - learning_event
   capabilities:
     - study_planning
     - error_analysis
     - review_prioritization
     - progress_analysis
     - exam_analysis
+    - learning_session_tracking
   supported_queries:
     - "制定教资学习计划"
     - "分析教资错题"
     - "查看考点掌握情况"
     - "分析真题题型分布"
     - "查看题型答题框架"
+    - "查看学习作答记录"
+    - "分析学习会话表现"
 
 tables:
   knowledge-modules:
@@ -79,6 +83,27 @@ tables:
     date_field: null
     status_field: "难度"
 
+  study-answers:
+    role: learning_event
+    entity_type: learning_event
+    preferred_for:
+      - progress_analysis
+      - error_analysis
+      - learning_session_tracking
+    primary_display_field: "作答标题"
+    date_field: "作答日期时间"
+    status_field: "作答结果"
+
+  study-sessions:
+    role: learning_session
+    entity_type: learning_event
+    preferred_for:
+      - progress_analysis
+      - learning_session_tracking
+    primary_display_field: "会话标题"
+    date_field: "开始时间"
+    status_field: "会话状态"
+
 fields:
   knowledge-modules:
     "模块名称":
@@ -113,11 +138,17 @@ fields:
       semantic_type: status
     "掌握程度":
       semantic_type: mastery_level
+    "能力等级":
+      semantic_type: mastery_level
     "考察频率":
       semantic_type: score
     "验证方式":
       semantic_type: knowledge_topic
     "连续正确次数":
+      semantic_type: attempt_count
+    "总作答次数":
+      semantic_type: attempt_count
+    "总正确次数":
       semantic_type: attempt_count
     "上次复习日期":
       semantic_type: event_date
@@ -127,12 +158,26 @@ fields:
       semantic_type: event_date
     "最近检测结果":
       semantic_type: outcome
+    "最近错误模式":
+      semantic_type: error_type
+    "最近7天作答数":
+      semantic_type: attempt_count
     "例词例句":
       semantic_type: content_text
     "知识树路径":
       semantic_type: knowledge_topic
     "关联真题":
       semantic_type: relation
+    "关联题型模板":
+      semantic_type: relation
+    "创建时间":
+      semantic_type: event_date
+    "创建人":
+      semantic_type: entity_identity_title
+    "修改人":
+      semantic_type: entity_identity_title
+    "最后更新时间":
+      semantic_type: event_date
 
   question-templates:
     "题型名称":
@@ -149,6 +194,26 @@ fields:
       semantic_type: content_text
     "关联模块":
       semantic_type: relation
+    "适用考题类型":
+      semantic_type: knowledge_topic
+    "建议限时分钟":
+      semantic_type: score
+    "默认满分值":
+      semantic_type: score
+    "撤除策略":
+      semantic_type: content_text
+    "L0无模板提示":
+      semantic_type: content_text
+    "L1仅题型名称":
+      semantic_type: content_text
+    "L2仅结构标题":
+      semantic_type: content_text
+    "L3关键词提示":
+      semantic_type: content_text
+    "L4简化模板":
+      semantic_type: content_text
+    "L5完整模板":
+      semantic_type: content_text
 
   error-notebook:
     "错题标题":
@@ -168,6 +233,22 @@ fields:
     "所属科目":
       semantic_type: knowledge_topic
     "关联考点":
+      semantic_type: relation
+    "错误模式分类":
+      semantic_type: error_type
+    "错误次数":
+      semantic_type: attempt_count
+    "错误原因分析":
+      semantic_type: error_type
+    "复测日期":
+      semantic_type: review_due_at
+    "复测结果":
+      semantic_type: outcome
+    "是否已订正":
+      semantic_type: status
+    "订正内容":
+      semantic_type: content_text
+    "关联作答记录":
       semantic_type: relation
 
   past-exam-questions:
@@ -194,4 +275,120 @@ fields:
     "关联考点":
       semantic_type: relation
     "关联模块":
+      semantic_type: relation
+
+  study-answers:
+    "作答标题":
+      semantic_type: entity_identity_title
+    "作答ID":
+      semantic_type: entity_identity_title
+    "操作ID":
+      semantic_type: entity_identity_title
+    "作答日期时间":
+      semantic_type: event_date
+    "题目文本":
+      semantic_type: content_text
+    "题目来源":
+      semantic_type: knowledge_topic
+    "用户答案原文":
+      semantic_type: content_text
+    "修改后答案":
+      semantic_type: content_text
+    "参考答案":
+      semantic_type: content_text
+    "作答结果":
+      semantic_type: outcome
+    "训练类型":
+      semantic_type: knowledge_topic
+    "得分":
+      semantic_type: score
+    "总分":
+      semantic_type: score
+    "评分结果":
+      semantic_type: outcome
+    "反馈内容":
+      semantic_type: content_text
+    "用时秒数":
+      semantic_type: score
+    "是否限时":
+      semantic_type: status
+    "信心程度":
+      semantic_type: score
+    "是否使用模板":
+      semantic_type: status
+    "模板提示等级":
+      semantic_type: mastery_level
+    "是否使用其他提示":
+      semantic_type: status
+    "是否看过资料":
+      semantic_type: status
+    "是否需要复测":
+      semantic_type: status
+    "是否完成订正":
+      semantic_type: status
+    "下次复测日期":
+      semantic_type: review_due_at
+    "错误大类":
+      semantic_type: error_type
+    "错误细类":
+      semantic_type: error_type
+    "关联考点":
+      semantic_type: relation
+    "关联知识模块":
+      semantic_type: relation
+    "关联真题":
+      semantic_type: relation
+    "关联题型模板":
+      semantic_type: relation
+    "学习会话ID":
+      semantic_type: relation
+
+  study-sessions:
+    "会话标题":
+      semantic_type: entity_identity_title
+    "会话ID":
+      semantic_type: entity_identity_title
+    "ID":
+      semantic_type: entity_identity_title
+    "会话类型":
+      semantic_type: knowledge_topic
+    "会话状态":
+      semantic_type: status
+    "学科":
+      semantic_type: knowledge_topic
+    "开始时间":
+      semantic_type: event_date
+    "结束时间":
+      semantic_type: event_date
+    "总用时分钟":
+      semantic_type: score
+    "题目总数":
+      semantic_type: attempt_count
+    "正确数":
+      semantic_type: attempt_count
+    "基本正确数":
+      semantic_type: attempt_count
+    "部分正确数":
+      semantic_type: attempt_count
+    "错误数":
+      semantic_type: attempt_count
+    "超时数":
+      semantic_type: attempt_count
+    "放弃数":
+      semantic_type: attempt_count
+    "得分率":
+      semantic_type: score
+    "是否完成复盘":
+      semantic_type: status
+    "学习反思":
+      semantic_type: content_text
+    "Agent总结":
+      semantic_type: content_text
+    "下次学习建议":
+      semantic_type: content_text
+    "建议下次学习日期":
+      semantic_type: review_due_at
+    "关联考点":
+      semantic_type: relation
+    "关联知识模块":
       semantic_type: relation
