@@ -25,7 +25,7 @@ Feishu Data Hub 采用 **"单仓库多项目"** 架构，核心理念是：
 ## 2. 目录结构
 
 ```
-feishu-learning-english-export/
+feishu-data-hub/
 ├── config/
 │   ├── hub.yaml                      # Hub 级全局配置
 │   ├── credential-profiles.yaml      # 凭据配置（引用 GitHub Secret 名称）
@@ -142,7 +142,7 @@ GitHub Pages
     │     - deploy-pages
     │
     ▼
-https://201650545.github.io/feishu-learning-english-export/
+https://201650545.github.io/feishu-data-hub/
 ```
 
 ### 3.1 同步编排流程（sync-hub.mjs）

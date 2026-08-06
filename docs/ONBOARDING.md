@@ -406,7 +406,7 @@ npm run validate:all
 访问以下 URL 查看 routing.json：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/routing.json
+https://201650545.github.io/feishu-data-hub/routing.json
 ```
 
 确认：
@@ -430,7 +430,7 @@ cat public/routing.json | node -e "const r=JSON.parse(require('fs').readFileSync
 2. 访问以下 URL 确认新项目已出现：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/catalog.json
+https://201650545.github.io/feishu-data-hub/catalog.json
 ```
 
 确认 `projects` 数组中包含新项目条目，且 `sync_status: "ok"`、`is_stale: false`。
@@ -438,9 +438,9 @@ https://201650545.github.io/feishu-learning-english-export/catalog.json
 3. 访问项目级入口确认数据正确：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/projects/<slug>/manifest.json
-https://201650545.github.io/feishu-learning-english-export/projects/<slug>/index.html
-https://201650545.github.io/feishu-learning-english-export/projects/<slug>/status.json
+https://201650545.github.io/feishu-data-hub/projects/<slug>/manifest.json
+https://201650545.github.io/feishu-data-hub/projects/<slug>/index.html
+https://201650545.github.io/feishu-data-hub/projects/<slug>/status.json
 ```
 
 4. 检查各表的 `record_count` 和 `field_count` 是否符合预期

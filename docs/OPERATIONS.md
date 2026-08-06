@@ -65,7 +65,7 @@
 **站点 URL**：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/
+https://201650545.github.io/feishu-data-hub/
 ```
 
 **部署来源**：`public/` 目录（通过 `actions/upload-pages-artifact` 上传）
@@ -86,7 +86,7 @@ https://201650545.github.io/feishu-learning-english-export/
 访问全局目录，确认所有项目状态：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/catalog.json
+https://201650545.github.io/feishu-data-hub/catalog.json
 ```
 
 关键字段：
@@ -101,7 +101,7 @@ https://201650545.github.io/feishu-learning-english-export/catalog.json
 访问特定项目的同步状态：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/projects/<slug>/status.json
+https://201650545.github.io/feishu-data-hub/projects/<slug>/status.json
 ```
 
 关键字段：
@@ -290,12 +290,12 @@ npm run project:add -- --slug <slug> --title "标题" --base-key <key>
 **解决**：
 1. 使用带 `?v=<build_id>` 查询参数的 URL 访问最新数据：
    ```
-   https://201650545.github.io/feishu-learning-english-export/catalog.json?v=<build_id>
+   https://201650545.github.io/feishu-data-hub/catalog.json?v=<build_id>
    ```
 2. 查看 `catalog.json` 中的 `build_id` 字段获取当前版本标识
 3. 使用版本化 catalog 路径访问特定版本：
    ```
-   https://201650545.github.io/feishu-learning-english-export/catalog-versioned/<build_id>.json
+   https://201650545.github.io/feishu-data-hub/catalog-versioned/<build_id>.json
    ```
 4. CDN 缓存通常在数分钟到数小时内自动刷新
 5. 若急需刷新，可强制重新部署（触发 Manual Sync）

@@ -133,7 +133,7 @@ async function main() {
 
 8. 验证部署
    - 等待 GitHub Actions 运行完成
-   - 访问: https://201650545.github.io/feishu-learning-english-export/catalog.json
+   - 访问: https://201650545.github.io/feishu-data-hub/catalog.json
    - 确认新项目出现在 catalog 中
 `);
 }

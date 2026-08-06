@@ -74,18 +74,18 @@
 **具体 URL 列表**：
 
 ```
-https://201650545.github.io/feishu-learning-english-export/index.html
-https://201650545.github.io/feishu-learning-english-export/data/manifest.json
-https://201650545.github.io/feishu-learning-english-export/data/schema.json
-https://201650545.github.io/feishu-learning-english-export/data/text-library/fields.json
-https://201650545.github.io/feishu-learning-english-export/data/text-library/records-0001.json
-https://201650545.github.io/feishu-learning-english-export/data/vocabulary/fields.json
-https://201650545.github.io/feishu-learning-english-export/data/vocabulary/records-0001.json
-https://201650545.github.io/feishu-learning-english-export/data/vocabulary/records-0002.json
-https://201650545.github.io/feishu-learning-english-export/data/learning-log/fields.json
-https://201650545.github.io/feishu-learning-english-export/data/learning-log/records-0001.json
-https://201650545.github.io/feishu-learning-english-export/data/daily-plan/fields.json
-https://201650545.github.io/feishu-learning-english-export/data/daily-plan/records-0001.json
+https://201650545.github.io/feishu-data-hub/index.html
+https://201650545.github.io/feishu-data-hub/data/manifest.json
+https://201650545.github.io/feishu-data-hub/data/schema.json
+https://201650545.github.io/feishu-data-hub/data/text-library/fields.json
+https://201650545.github.io/feishu-data-hub/data/text-library/records-0001.json
+https://201650545.github.io/feishu-data-hub/data/vocabulary/fields.json
+https://201650545.github.io/feishu-data-hub/data/vocabulary/records-0001.json
+https://201650545.github.io/feishu-data-hub/data/vocabulary/records-0002.json
+https://201650545.github.io/feishu-data-hub/data/learning-log/fields.json
+https://201650545.github.io/feishu-data-hub/data/learning-log/records-0001.json
+https://201650545.github.io/feishu-data-hub/data/daily-plan/fields.json
+https://201650545.github.io/feishu-data-hub/data/daily-plan/records-0001.json
 ```
 
 **注意**：`vocabulary` 表有 6000 条记录，按 `chunk_size: 500` 分片，共 12 个分片（`records-0001.json` 到 `records-0012.json`）。

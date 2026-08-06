@@ -2,7 +2,7 @@
 
 统一公开导出的飞书多维表格数据中心。将飞书 Bitable 数据导出为静态 JSON，部署到 GitHub Pages，供 AI 工具和其他消费者读取数据模型、记录和表间关联，无需飞书访问权限。
 
-**站点地址**：https://201650545.github.io/feishu-learning-english-export/
+**站点地址**：https://201650545.github.io/feishu-data-hub/
 
 ---
 
