@@ -10,11 +10,8 @@ project:
     - resources
     - infrastructure
   entity_types:
-    - resource
-    - tool
-    - api_channel
-    - gateway
-    - repository
+    - reference
+    - content
   capabilities:
     - resource_discovery
     - resource_selection
@@ -31,8 +28,8 @@ project:
 
 tables:
   assets:
-    role: catalog
-    entity_type: resource
+    role: reference
+    entity_type: reference
     preferred_for:
       - resource_discovery
       - resource_selection
@@ -46,16 +43,16 @@ fields:
     "工具名称":
       semantic_type: entity_identity_title
     "类型":
-      semantic_type: resource_category
+      semantic_type: knowledge_topic
     "模型":
-      semantic_type: model_capability
+      semantic_type: content_text
     "说明":
-      semantic_type: description_text
+      semantic_type: content_text
     "链接":
       semantic_type: source_reference
     "层级":
-      semantic_type: architecture_layer
+      semantic_type: knowledge_topic
     "成本":
-      semantic_type: cost_indicator
+      semantic_type: content_text
     "状态":
-      semantic_type: operational_status
+      semantic_type: status
