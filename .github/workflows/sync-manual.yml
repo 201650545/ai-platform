@@ -89,10 +89,14 @@ jobs:
       - name: Validate public output
         if: github.event.inputs.dry_run != 'true'
         run: npm run validate
+        env:
+          FDH_NAME_BLACKLIST: ${{ secrets.FDH_NAME_BLACKLIST }}
 
       - name: Security scan
         if: github.event.inputs.dry_run != 'true'
         run: npm run security:scan
+        env:
+          FDH_NAME_BLACKLIST: ${{ secrets.FDH_NAME_BLACKLIST }}
 
       - name: Configure Pages
         if: github.event.inputs.dry_run != 'true'

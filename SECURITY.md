@@ -24,6 +24,7 @@
 | `FEISHU_APP_SECRET` | 飞书应用密钥（绝不记录、绝不写入输出） |
 | `FEISHU_BASE_TOKEN` | 单 Base app_token（遗留回退） |
 | `FEISHU_BASE_REGISTRY_JSON` | 多 Base 注册表（`{"base-key": {"app_token": "REDACTED"}}`） |
+| `FDH_NAME_BLACKLIST` | 学生姓名黑名单（逗号/换行分隔），`security-scan.mjs` 读取；命中即终止部署。值为敏感数据，仅存于 Secret，绝不入代码 |
 
 ## 绝不进入日志、代码或输出的信息
 
@@ -34,6 +35,7 @@
 - GitHub Token 值
 - 飞书 `app_token` / `BASE_TOKEN` 值
 - 飞书内部 `table_id` 值
+- 学生真实姓名（由 `FDH_NAME_BLACKLIST` Secret 注入的名单，代码中绝不出现）
 
 ## 运行时保障
 

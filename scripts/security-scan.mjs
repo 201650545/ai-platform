@@ -1,6 +1,10 @@
 // scripts/security-scan.mjs — Security scanning of all output files.
 // Scans for leaked secrets (FATAL), forbidden files (FATAL), internal Feishu
-// identifiers (FATAL), PII (warning), and high-entropy strings (warning).
+// identifiers (FATAL), blacklisted names (FATAL), PII (warning), and
+// high-entropy strings (warning).
+//
+// 姓名黑名单：通过环境变量 FDH_NAME_BLACKLIST 注入（逗号/换行分隔），
+// 不写死在仓库里。命中即 FATAL，终止部署。
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -11,6 +15,8 @@ import {
   scanTokenPrefixes,
   scanHighEntropy,
   scanForPII,
+  loadNameBlacklist,
+  scanForBlacklistedNames,
   isForbiddenFile,
 } from "../lib/security.mjs";
 import { walkDir } from "../lib/output.mjs";
@@ -42,10 +48,19 @@ export async function securityScan(rootDir) {
     tokenHits: 0,
     forbiddenFiles: 0,
     internalIdHits: 0,
+    blacklistHits: 0,
   };
 
   const hubConfig = await loadHubConfig();
   const outputDir = rootDir || path.resolve(".", hubConfig.output.root_dir);
+
+  // 姓名黑名单来自环境变量 FDH_NAME_BLACKLIST，未配置则规则停用（不阻塞 CI）。
+  const nameBlacklist = loadNameBlacklist();
+  if (nameBlacklist.length > 0) {
+    console.log(`姓名黑名单已启用：${nameBlacklist.length} 个姓名，命中即终止部署`);
+  } else {
+    console.log("姓名黑名单未配置（FDH_NAME_BLACKLIST 为空），规则停用");
+  }
 
   console.log(`安全扫描目录：${outputDir}`);
 
@@ -128,6 +143,14 @@ export async function securityScan(rootDir) {
       console.log(`[警告] PII 疑似：${relativePath} (${piiFindings.length} 处)`);
     }
 
+    // Check for blacklisted names (FATAL — stops deployment)
+    const blacklistFindings = scanForBlacklistedNames(text, nameBlacklist);
+    if (blacklistFindings.length > 0) {
+      fatalErrors.push(`姓名黑名单：${relativePath} (${blacklistFindings.join(", ")})`);
+      stats.blacklistHits += blacklistFindings.length;
+      console.error(`[致命] 姓名黑名单：${relativePath} (${blacklistFindings.join(", ")})`);
+    }
+
     // Check for high-entropy strings (WARNING)
     const entropyFindings = scanHighEntropy(text);
     if (entropyFindings.length > 0) {
@@ -155,6 +178,7 @@ async function main() {
     console.log(`Token 前缀：${result.stats.tokenHits}`);
     console.log(`内部标识符：${result.stats.internalIdHits}`);
     console.log(`禁止文件：${result.stats.forbiddenFiles}`);
+    console.log(`姓名黑名单：${result.stats.blacklistHits}`);
     console.log(`PII 疑似（警告）：${result.stats.piiHits}`);
     console.log(`高熵字符串（警告）：${result.stats.entropyHits}`);
     console.log(`致命错误：${result.fatalErrors.length}`);
