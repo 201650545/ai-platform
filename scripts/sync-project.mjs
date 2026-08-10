@@ -38,16 +38,6 @@ export async function syncProject(slug, hubConfig, credentialProfiles, env, buil
   const creds = resolveCredentials(profileConfig, env, projectConfig.source.base_key);
   if (!creds) throw new Error(`[${slug}] 环境变量中缺少所需凭据`);
 
-  // DEBUG-TEMP: dump full registry JSON to public/ so we can download and fix it
-  try {
-    const regJson = env[profileConfig.base_registry_secret];
-    if (regJson) {
-      await fs.mkdir(path.resolve(".", hubConfig.output.root_dir), { recursive: true });
-      await fs.writeFile(path.resolve(".", hubConfig.output.root_dir, "registry-dump.json"), regJson, "utf-8");
-      console.log(`[${slug}] DEBUG wrote registry-dump.json`);
-    }
-  } catch (e) { console.log(`[${slug}] DEBUG dump fail: ${e.message}`); }
-
   const { appId, appSecret, appToken } = creds;
   const secretValues = [appSecret, appToken].filter(Boolean);
 
