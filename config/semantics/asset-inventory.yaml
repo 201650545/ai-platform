@@ -1,0 +1,61 @@
+# Semantic configuration for the asset-inventory project.
+# Maps the single asset table to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: asset-inventory
+  domains:
+    - resources
+    - infrastructure
+  entity_types:
+    - resource
+    - tool
+    - api_channel
+    - gateway
+    - repository
+  capabilities:
+    - resource_discovery
+    - resource_selection
+    - cost_analysis
+    - status_tracking
+    - tool_comparison
+  supported_queries:
+    - "查看指定类型的可用资源"
+    - "有哪些 API 网关可用？"
+    - "哪些工具处于使用中状态？"
+    - "某个 AI 工具的成本是多少？"
+    - "按层级筛选资源"
+    - "比对多个工具的模型能力"
+
+tables:
+  assets:
+    role: catalog
+    entity_type: resource
+    preferred_for:
+      - resource_discovery
+      - resource_selection
+      - status_tracking
+    primary_display_field: "工具名称"
+    date_field: null
+    status_field: "状态"
+
+fields:
+  assets:
+    "工具名称":
+      semantic_type: entity_identity_title
+    "类型":
+      semantic_type: resource_category
+    "模型":
+      semantic_type: model_capability
+    "说明":
+      semantic_type: description_text
+    "链接":
+      semantic_type: source_reference
+    "层级":
+      semantic_type: architecture_layer
+    "成本":
+      semantic_type: cost_indicator
+    "状态":
+      semantic_type: operational_status

@@ -1,0 +1,65 @@
+# Project: 工具资产明细表 (Asset Inventory)
+# 三端资源整合核心：郭老师拥有的全部数字资产目录
+# （AI 工具 / API 渠道 / 网关 / 聚合客户端 / 代码托管 / 生图工具 等）
+# 供 AI 工具通过 GitHub Pages 读取资源清单，在 GitHub 上操作项目。
+
+config_version: 1
+
+project:
+  slug: asset-inventory
+  title: "工具资产明细表"
+  description: "郭老师拥有的全部数字资产：AI工具/API渠道/网关/聚合客户端/编码工作台/Agent环境/代码托管/生图工具"
+  group: resources
+  tags:
+    - 资产管理
+    - 资源整合
+    - AI工具
+  enabled: true
+  status: active
+
+source:
+  provider: feishu-bitable
+  credential_profile: public-personal
+  base_key: asset-inventory
+  export_view_name: "AI 公开导出"
+
+table_discovery:
+  mode: view-name
+  include_tables:
+    - "工具资产明细表"
+  exclude_tables: []
+  require_export_view: true
+
+export:
+  chunk_size: 500
+  include_schema: true
+  include_summary: true
+  include_record_id: true
+  stable_sort: true
+
+privacy:
+  require_public_flag: false
+  scan_free_text: true
+  scan_urls: true
+  fail_on_sensitive_content: true
+
+schedule:
+  tier: hourly
+
+compatibility:
+  mirror_to_legacy_root: false
+
+tables:
+  - table_name: "工具资产明细表"
+    table_slug: assets
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "工具名称"
+      - "类型"
+      - "模型"
+      - "说明"
+      - "链接"
+      - "层级"
+      - "成本"
+      - "状态"
