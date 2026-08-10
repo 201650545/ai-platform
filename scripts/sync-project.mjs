@@ -114,6 +114,8 @@ export async function syncProject(slug, hubConfig, credentialProfiles, env, buil
 
   for (const tc of tablesToExport) {
     console.log(`[${slug}] 同步数据表：${tc.table_name}`);
+    // DEBUG-TEMP: log what base we actually resolved (appId + appToken prefix) and which tables the bot saw
+    console.log(`[${slug}] DEBUG base_key=${projectConfig.source.base_key} appId=${appId} appToken=${appToken ? appToken.slice(0,10)+"…" : "(none)"} tablesSeen=[${allTables.map(t=>t.name).join(", ")}]`);
     const table = exactOne(allTables, "name", tc.table_name, `[${slug}] 数据表`);
     const tableId = table.table_id;
     if (!tableId) throw new Error(`[${slug}] 数据表缺少 table_id：${tc.table_name}`);
