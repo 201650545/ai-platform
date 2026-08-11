@@ -5,6 +5,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 
 import { loadHubConfig, loadCredentialProfiles, loadAllProjects, loadProjectConfig } from "../lib/config.mjs";
@@ -156,6 +157,9 @@ async function syncHub(options = {}) {
   assertNoSecrets(homepage, [], "hub homepage");
   await fs.writeFile(path.join(outputDir, hubConfig.output.homepage_file), homepage, "utf8");
   console.log("Hub homepage written");
+
+  // 防噪音部署（P3-2）：内容无实质变化时标记 .deploy-skip，工作流据此跳过 Pages 部署
+  await maybeMarkDeploySkip(outputDir, buildId, options);
 
   // Summary
   const ok = results.filter(r => r.status === "ok").length;
@@ -419,6 +423,78 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve("scripts/s
     console.error(`Data Hub 同步失败：${e.message}`);
     process.exitCode = 1;
   });
+}
+
+/* ==================== 防噪音部署（P3-2） ==================== */
+
+const EXCLUDE_DIRS = new Set(["catalog-versioned"]);
+const EXCLUDE_FILES = new Set([".content-hash", ".deploy-skip"]);
+
+async function collectOutputFiles(outputDir) {
+  const out = [];
+  async function walk(dir) {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!EXCLUDE_DIRS.has(e.name)) await walk(p);
+      } else if (!EXCLUDE_FILES.has(e.name)) {
+        out.push(p);
+      }
+    }
+  }
+  await walk(outputDir);
+  return out;
+}
+
+/**
+ * 计算「实质内容」hash：排除 catalog-versioned/（天然每次新增），并剔除 build_id
+ * 字符串（CDN 缓存失效用，非内容变化），使飞书数据未变时 hash 稳定。
+ */
+async function computeContentHash(outputDir, buildId) {
+  const files = (await collectOutputFiles(outputDir)).sort();
+  const h = createHash("sha256");
+  for (const f of files) {
+    const rel = path.relative(outputDir, f);
+    let content = await fs.readFile(f, "utf8");
+    if (buildId) content = content.split(buildId).join("");
+    h.update(rel).update("\0").update(content).update("\0");
+  }
+  return h.digest("hex");
+}
+
+/**
+ * 防噪音：与上次部署的 hash 对比。一致 → 写 public/.deploy-skip（工作流跳过部署）。
+ * 无 FDH_PREV_HASH_URL（或 --force、首跑、网络失败）→ 视为有变化，正常发布。
+ */
+async function maybeMarkDeploySkip(outputDir, buildId, options) {
+  const skipFile = path.join(outputDir, ".deploy-skip");
+  try {
+    const hash = await computeContentHash(outputDir, buildId);
+    await fs.writeFile(path.join(outputDir, ".content-hash"), hash, "utf8");
+    const prevUrl = (process.env.FDH_PREV_HASH_URL || "").trim();
+    if (options.force || !prevUrl) {
+      await fs.rm(skipFile, { force: true });
+      return;
+    }
+    let prev = null;
+    try {
+      const res = await fetch(prevUrl, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) prev = (await res.text()).trim();
+    } catch {
+      prev = null;
+    }
+    if (prev && prev === hash) {
+      await fs.writeFile(skipFile, `内容无实质变化: ${hash}`, "utf8");
+      console.log("✅ 内容无实质变化，已标记 .deploy-skip（工作流将跳过部署）");
+    } else {
+      await fs.rm(skipFile, { force: true });
+      console.log("内容有变化或首次部署，正常发布");
+    }
+  } catch (e) {
+    await fs.rm(skipFile, { force: true });
+    console.warn(`⚠ 防噪音 hash 计算失败（按有变化处理）: ${e.message}`);
+  }
 }
 
 export { syncHub };
