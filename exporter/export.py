@@ -22,6 +22,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -34,6 +35,7 @@ OUTPUT_DIR = REPO_ROOT / "public"
 UTC8 = datetime.timezone(datetime.timedelta(hours=8))
 HTTP_TIMEOUT = 30
 PAGE_SIZE = 500
+MAX_RETRIES = 4
 
 
 # ---------- 配置加载 ----------
@@ -45,20 +47,48 @@ def load_config():
 
 # ---------- Feishu API（仅 stdlib） ----------
 
+def _retry_wait(e, attempt):
+    """429/5xx 指数退避，尊重 Retry-After；403/401 等配置错误不重试。"""
+    ra = (e.headers.get("Retry-After") if getattr(e, "headers", None) else None)
+    if ra and ra.isdigit():
+        return min(int(ra), 60)
+    return min(2 ** attempt, 30)  # 0,2,4,8,16 → 累计约 30s
+
+
 def http_json(method, url, headers=None, body=None):
-    """发 HTTP 请求并解析 JSON 响应。"""
+    """发 HTTP 请求并解析 JSON 响应（429/5xx/网络抖动有限重试）。
+
+    错误日志只输出 host，绝不输出完整 URL（URL 路径含 FEISHU_BASE_TOKEN）
+    也不输出响应 body（可能含敏感字段名），避免把凭证写进 CI 日志。
+    """
     headers = dict(headers or {})
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
     if body is not None:
         # urllib 默认给表单类型；飞书要求 application/json，否则 10003 invalid param
         headers.setdefault("Content-Type", "application/json")
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        raw = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {e.code} {url}\n{raw[:2000]}") from e
+    host = urllib.parse.urlsplit(url).hostname
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            retryable = e.code in (429, 500, 502, 503, 504)
+            if not retryable:
+                # 401/403/404 等配置或路径错误：不重试，直接失败
+                raise RuntimeError(f"HTTP {e.code} host={host}") from e
+            last_err = e
+            wait = _retry_wait(e, attempt)
+            print(f"  [重试] HTTP {e.code} host={host} attempt={attempt+1} wait={wait}s")
+            time.sleep(wait)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            last_err = e
+            wait = min(2 ** attempt, 30)
+            print(f"  [重试] 网络异常 {type(e).__name__} attempt={attempt+1} wait={wait}s")
+            time.sleep(wait)
+    raise RuntimeError(
+        f"HTTP 重试耗尽 host={host} last={type(last_err).__name__}") from last_err
 
 
 def feishu_auth(base_cfg):
@@ -233,8 +263,11 @@ def write_outputs(table_records, meta):
         "site": "AI 自助资源运营体系 · 公开数据桥",
         "repo": "https://github.com/201650545/ai-resource-hub",
         "bridge_version": meta["bridge_version"],
+        "build_id": meta["build_id"],
         "generated_at": meta["generated_at"],
-        "note": "公开数据桥（方案书 §6.7）：白名单 DTO + 额度区间模糊化；凭证值/精确额度/内部账号绝不公开。",
+        "freshness": {"stale_after_hours": 48},
+        "note": "公开数据桥（方案书 §6.7）：白名单 DTO + 额度区间模糊化；凭证值/精确额度/内部账号绝不公开。"
+                "消费方注意：generated_at 距今超过 48h 时数据视为陈旧，只作架构参考。",
         "tables": {
             "capabilities": {"count": len(capabilities), "file": "capabilities.json",
                              "primary_key": "capability_id"},
@@ -337,8 +370,13 @@ def main():
 
     print("③ 敏感扫描")
     # 先写入，后扫描，保证扫描对象就是即将部署的产物
+    # build_id = 内容哈希（不含 generated_at）：数据未变化时保持稳定，
+    # 供 CI 判断「是否需要部署」，避免每天无意义重传。
+    canonical = json.dumps(table_records, ensure_ascii=False, sort_keys=True,
+                           separators=(",", ":"))
     meta = {
         "bridge_version": cfg["bridge_version"],
+        "build_id": hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16],
         "generated_at": datetime.datetime.now(UTC8).isoformat(timespec="seconds"),
         "table_configs": table_configs,
     }
