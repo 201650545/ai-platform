@@ -428,7 +428,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve("scripts/s
 /* ==================== 防噪音部署（P3-2） ==================== */
 
 const EXCLUDE_DIRS = new Set(["catalog-versioned"]);
-const EXCLUDE_FILES = new Set([".content-hash", ".deploy-skip"]);
+const EXCLUDE_FILES = new Set(["content-hash", ".deploy-skip"]);
 
 async function collectOutputFiles(outputDir) {
   const out = [];
@@ -471,7 +471,7 @@ async function maybeMarkDeploySkip(outputDir, buildId, options) {
   const skipFile = path.join(outputDir, ".deploy-skip");
   try {
     const hash = await computeContentHash(outputDir, buildId);
-    await fs.writeFile(path.join(outputDir, ".content-hash"), hash, "utf8");
+    await fs.writeFile(path.join(outputDir, "content-hash"), hash, "utf8");
     const prevUrl = (process.env.FDH_PREV_HASH_URL || "").trim();
     if (options.force || !prevUrl) {
       await fs.rm(skipFile, { force: true });

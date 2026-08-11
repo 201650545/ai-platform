@@ -67,7 +67,7 @@ jobs:
           PROJECT_SLUG: ${{ github.event.inputs.project_slug }}
           FORCE: ${{ github.event.inputs.force }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
-          # P3-2 防噪音：上次部署的 .content-hash URL（如 https://<user>.github.io/<repo>/.content-hash）
+          # P3-2 防噪音：上次部署的 content-hash URL（如 https://<user>.github.io/<repo>/content-hash）
           FDH_PREV_HASH_URL: ${{ secrets.FDH_PREV_HASH_URL }}
         run: |
           set -euo pipefail
