@@ -40,7 +40,7 @@ privacy:
   fail_on_sensitive_content: true
 
 schedule:
-  tier: hourly
+  tier: daily
 
 compatibility:
   mirror_to_legacy_root: false

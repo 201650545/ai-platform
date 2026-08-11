@@ -45,7 +45,7 @@ privacy:
   fail_on_sensitive_content: true
 
 schedule:
-  tier: hourly
+  tier: daily
 
 compatibility:
   # Mirror new data to legacy paths so existing consumers don't break.
