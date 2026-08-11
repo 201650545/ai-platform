@@ -61,6 +61,41 @@ def quota_bands(cfg):
     return bands
 
 
+def check_classifications(table_cfg, schema_cfg):
+    """classification 硬校验（GPT 建议 #10）：
+    - 白名单字段必须声明 classification（无声明 = 默认拒绝，防策略随表数量退化）
+    - PUBLIC_COARSE 字段必须已有 transform（出现在 computed/fuzz）
+    - SECRET 字段绝不能泄漏进 schema 输出
+    """
+    issues = []
+    slug = table_cfg["slug"]
+    cls = table_cfg.get("classifications", {})
+    public = set(cls.get("PUBLIC", []))
+    coarse = set(cls.get("PUBLIC_COARSE", []))
+    secret = set(cls.get("SECRET", []))
+    declared = public | coarse | set(cls.get("INTERNAL", [])) | secret
+
+    fields = set(schema_cfg.get("fields") or [])
+    computed = set(schema_cfg.get("computed") or [])
+
+    undeclared = fields - declared
+    if undeclared:
+        issues.append(
+            f"[致命] {slug}: 白名单字段未声明 classification（默认拒绝）: {sorted(undeclared)}")
+
+    coarse_missing = coarse - computed
+    if coarse_missing:
+        issues.append(
+            f"[致命] {slug}: PUBLIC_COARSE 字段缺少 transform（不在 computed）: {sorted(coarse_missing)}")
+
+    leaked = (fields | computed) & secret
+    if leaked:
+        issues.append(
+            f"[致命] {slug}: SECRET 分类字段泄漏进产物 schema: {sorted(leaked)}")
+
+    return issues
+
+
 def issues_for_table(table_cfg, schema_cfg, records, bands):
     """返回该表全部校验问题。"""
     issues = []
@@ -170,6 +205,7 @@ def main():
         records = load_table(slug)
         records_by_slug[slug] = records
         schema_cfg = schema.get("tables", {}).get(slug, {})
+        all_issues += check_classifications(table_cfg, schema_cfg)
         all_issues += issues_for_table(table_cfg, schema_cfg, records, bands)
 
     # 3) 引用完整性
