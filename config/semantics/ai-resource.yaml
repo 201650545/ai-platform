@@ -1,0 +1,88 @@
+# Semantic configuration for the ai-resource project.
+# Maps tables and fields to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: ai-resource
+  domains:
+    - infrastructure
+    - ai-resources
+  entity_types:
+    - reference
+    - metric
+  capabilities:
+    - resource_discovery
+    - instance_selection
+    - quota_analysis
+    - routing_support
+  supported_queries:
+    - "有哪些可用的 AI 能力？"
+    - "DeepSeek 的 API 怎么调用？"
+    - "现在哪个平台的免费额度还够用？"
+    - "给我推荐一个可用的 LLM 实例"
+    - "哪些实例额度快耗尽了？"
+
+tables:
+  capabilities:
+    role: reference
+    entity_type: reference
+    preferred_for:
+      - resource_discovery
+      - routing_support
+    primary_display_field: "资源名称"
+    date_field: null
+    status_field: "状态"
+
+  instances:
+    role: metric
+    entity_type: metric
+    preferred_for:
+      - instance_selection
+      - quota_analysis
+      - routing_support
+    primary_display_field: "instance_id"
+    date_field: "额度到期日"
+    status_field: "状态"
+
+fields:
+  capabilities:
+    "capability_id":
+      semantic_type: entity_identity_title
+    "资源名称":
+      semantic_type: entity_identity_title
+    "类别":
+      semantic_type: knowledge_topic
+    "逻辑模型":
+      semantic_type: knowledge_topic
+    "模型族":
+      semantic_type: knowledge_topic
+    "调用方式":
+      semantic_type: status
+    "认证方案":
+      semantic_type: status
+    "状态":
+      semantic_type: status
+
+  instances:
+    "instance_id":
+      semantic_type: entity_identity_title
+    "平台":
+      semantic_type: knowledge_topic
+    "实际模型名":
+      semantic_type: knowledge_topic
+    "状态":
+      semantic_type: status
+    "重置规则":
+      semantic_type: status
+    "验证策略":
+      semantic_type: status
+    "额度重置日":
+      semantic_type: event_date
+    "额度到期日":
+      semantic_type: due_date
+    "上次验证":
+      semantic_type: event_date
+    "下次验证":
+      semantic_type: review_due_at

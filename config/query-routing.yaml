@@ -60,6 +60,34 @@ intents:
       - study-logs
       - self-test-questions
 
+  ai_resource_selection:
+    description: "选择可用的 AI 资源实例（能力发现 + 实例选择）"
+    capabilities:
+      - resource_discovery
+      - instance_selection
+      - routing_support
+    selection: all_active_matching
+    record_data_required: true
+    recommended_first_files:
+      - "projects/ai-resource/summary.md"
+      - "projects/ai-resource/agent-guide.md"
+      - "projects/ai-resource/semantic.json"
+    recommended_tables:
+      - capabilities
+      - instances
+
+  ai_resource_quota:
+    description: "分析 AI 资源额度状态（剩余额度/重置/到期）"
+    capabilities:
+      - quota_analysis
+    selection: all_active_matching
+    record_data_required: true
+    recommended_first_files:
+      - "projects/ai-resource/agent-guide.md"
+      - "projects/ai-resource/semantic.json"
+    recommended_tables:
+      - instances
+
   english_review:
     description: "分析英语复习情况"
     projects:
