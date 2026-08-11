@@ -45,8 +45,12 @@ def load_config():
 
 def http_json(method, url, headers=None, body=None):
     """发 HTTP 请求并解析 JSON 响应。"""
+    headers = dict(headers or {})
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
-    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    if body is not None:
+        # urllib 默认给表单类型；飞书要求 application/json，否则 10003 invalid param
+        headers.setdefault("Content-Type", "application/json")
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
             return json.loads(resp.read().decode("utf-8"))
