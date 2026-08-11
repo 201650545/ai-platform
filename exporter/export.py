@@ -62,7 +62,10 @@ def feishu_auth(base_cfg):
             "app_secret": os.environ[base_cfg["app_secret_env"]]}
     resp = http_json("POST", url, body=body)
     if resp.get("code") != 0:
-        raise RuntimeError(f"认证失败: code={resp.get('code')} msg={resp.get('msg')}")
+        raise RuntimeError(
+            f"认证失败: code={resp.get('code')} msg={resp.get('msg')} "
+            f"len_id={len(os.environ[base_cfg['app_id_env']])} "
+            f"len_secret={len(os.environ[base_cfg['app_secret_env']])}")
     return resp["tenant_access_token"]
 
 
