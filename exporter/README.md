@@ -30,7 +30,7 @@
 # 真实同步（需要环境变量）
 export FEISHU_APP_ID="cli_xxxx"
 export FEISHU_APP_SECRET="xxxx"
-export FEISHU_BASE_TOKEN="StmDbTXQWaujshs9NpIc3UFpnAc"
+export FEISHU_BASE_TOKEN="<飞书 Base app_token，从 Base 设置复制>"
 python exporter/export.py
 
 # 本地验证链路（无需凭据，用 fixture 数据）
@@ -50,7 +50,7 @@ python exporter/check_changed.py                             # build_id 变更�
 # 真实同步（需要环境变量）
 export FEISHU_APP_ID="cli_xxxx"
 export FEISHU_APP_SECRET="xxxx"
-export FEISHU_BASE_TOKEN="StmDbTXQWaujshs9NpIc3UFpnAc"
+export FEISHU_BASE_TOKEN="<飞书 Base app_token，从 Base 设置复制>"
 python exporter/export.py
 
 # 本地验证链路（无需凭据，用 fixture 数据）
