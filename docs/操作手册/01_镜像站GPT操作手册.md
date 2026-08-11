@@ -40,10 +40,13 @@
    - `Configure...` — `model-configure-modal`
 3. 点 `Thinking•Extended` 选中；composer 显示 `Extended` 按钮即已生效。
 
-## 4. 注入长提示词（关键：base64 + native setter）
+## 4. 注入长提示词（关键：base64 + 双模式注入）
 
 > ⚠️ 提示词长、含双引号/中文，直接 `type` 会因 Windows 命令行解析失败。
-> ⚠️ `prompt-textarea` 是 `<textarea>`（React 受控），`execCommand('insertText')` 对它无效，必须用 **native value setter + input 事件**。
+> ⚠️ **编辑器有两种形态，注入方法完全不同**（2026-08-10 实测踩坑）：
+> - 新版：真正编辑器是 `#prompt-textarea[contenteditable=true]` 的 **DIV**，`[name=prompt-textarea]` 是**隐藏 fallback textarea**（`offsetParent===null`）。→ 用 `execCommand('insertText')`。
+> - 旧版：编辑器是 `<textarea>` 本身。→ 用 native value setter。
+> **判定**：先查 `document.querySelector('[contenteditable=true]')`，存在即 contenteditable 模式。
 
 在本地（PowerShell）：
 ```powershell
@@ -52,15 +55,20 @@ $c = Get-Content "提示词文件.md" -Raw -Encoding UTF8
 $m = [regex]::Match($c, '```\r?\n([\s\S]*?)\r?\n```'); $p = $m.Groups[1].Value
 $b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p))
 
-# 注入（eval 外层双引号、内部单引号）
-$js = "(()=>{const b=atob('$b');const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const s=new TextDecoder().decode(u);const el=document.querySelector('[name=prompt-textarea]');const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;setter.call(el,s);el.dispatchEvent(new Event('input',{bubbles:true}));return el.value.length;})()"
-opencli browser <session> eval $js   # 返回 字符长度 即成功
+# 注入（eval 外层双引号、内部单引号）——contenteditable 模式（首选）
+$js = "(()=>{const b=atob('$b');const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const s=new TextDecoder().decode(u);const el=document.querySelector('#prompt-textarea[contenteditable=true]')||document.querySelector('[contenteditable=true]');el.focus();el.innerHTML='';document.execCommand('insertText',false,s);return JSON.stringify({len:el.innerText.length,tail:(el.innerText||'').slice(-30)});})()"
+opencli browser <session> eval $js
+
+# 若上面 len≈0（textarea 模式），改用 native setter：
+$js2 = "(()=>{const b=atob('$b');const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const s=new TextDecoder().decode(u);const el=document.querySelector('[name=prompt-textarea]');const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;setter.call(el,s);el.dispatchEvent(new Event('input',{bubbles:true}));return el.value.length;})()"
+opencli browser <session> eval $js2
 ```
 
-注入后校验：
+注入后校验（contenteditable 看 innerText / textarea 看 value），并确认**发送按钮出现**：
 ```js
-(()=>{const el=document.querySelector('[name=prompt-textarea]');return JSON.stringify({head:el.value.slice(0,40),tail:el.value.slice(-40)});})()
+(()=>{const ce=document.querySelector('[contenteditable=true]');const ta=document.querySelector('[name=prompt-textarea]');const send=document.querySelector('[data-testid=send-button]');return JSON.stringify({ceLen:ce?(ce.innerText||'').length:0,taLen:ta?(ta.value||'').length:0,sendBtn:!!send,disabled:send?send.disabled:null});})()
 ```
+⚠️ 发送按钮（`[data-testid=send-button]`）不出现 = React 没感知内容（通常因为注入方式不对），此时发不出。
 
 ## 5. 发送 + 监控完成
 
