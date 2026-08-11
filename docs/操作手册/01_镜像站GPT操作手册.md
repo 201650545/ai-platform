@@ -88,6 +88,22 @@ opencli browser <session> eval $js2
 - 完整回复保存到 `docs/ai-advice/`（文件名含日期+问诊对象），关键结论提炼后更新对应方案/表格。
 - 凭证值（authToken/JWT、API key）一律不落文件、不写仓库、不外发。
 
+## 7. 已知问题与兜底（2026-08-10 实测）
+
+### 7.1 含多个 GitHub 链接的提示词 → Deep Research 渲染失败 → 空回复
+- **现象**：user 消息完整发出，assistant 消息 0 字符；页面出现搜索来源块（`:::` 列表）和 "Show more"；`stop` 按钮消失后无任何回答。
+- **实测**：vip-19 实例，Extended×2 + Auto×1 三次全部空回复（提示词含 5 个 GitHub 链接）。判断为该实例对多链接提示词自动触发 Deep Research，但 research 结果渲染失败。
+- **判定**：`eval` 检查 `[data-message-author-role=assistant]` 的 `innerText.length` 是否 0 + 页面有无搜索来源文本。
+- **兜底**：**转 Claude**（见 03 手册）——claude.ai 无此问题，Sonnet 5 High 免费可用。
+
+### 7.2 部分实例模型菜单打不开
+- vip-12 等实例点击 Auto pill 后菜单不弹出（popover 渲染异常）。vip-19 重登后也可能偶发。
+- **对策**：换健康账号重登，或直接用默认 Auto 模式（不强求 Extended）。
+
+### 7.3 账号池会漂移
+- 健康账号（isHealthy:true）名单随镜像站维护变化；已见 vip-15 由健康降为"受限"。
+- 每次操作先读 `panelAccountList` 重新确认，勿依赖固定账号。
+
 ---
 
 ## 附：opencli eval 传参引号规则（本次踩坑）
