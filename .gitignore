@@ -1,0 +1,19 @@
+# 凭证/密钥——绝不上库（方案书 §6 安全边界）
+**/credentials.json
+**/.env
+**/*.key
+**/*.pem
+
+# 本地配置目录
+config/
+
+# 运行时产物
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+__pycache__/
+*.pyc
+
+# 系统
+.DS_Store
+Thumbs.db
