@@ -17,11 +17,13 @@
 """
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -198,15 +200,21 @@ def build_dto(table_cfg, raw_fields):
 # ---------- 敏感扫描 ----------
 
 def scan_outputs(root, patterns):
-    """对全部公开产物做敏感扫描，命中即返回问题列表。"""
+    """对全部公开产物做敏感扫描，命中即返回问题列表。
+
+    命中值绝不写入日志：只输出 文件/检测器/offset/命中长度/sha256 前 12 位，
+    避免「成功拦截部署、却把疑似凭证写进 CI 日志」。
+    """
     issues = []
     for path in sorted(root.rglob("*.json")):
         text = path.read_text(encoding="utf-8")
         for pat in patterns:
             for m in re.finditer(pat, text, re.IGNORECASE):
-                start = max(0, m.start() - 18)
-                snippet = text[start:m.end() + 18].replace("\n", " ")
-                issues.append(f"{path.name}: /{pat}/ → …{snippet}…")
+                digest = hashlib.sha256(m.group(0).encode("utf-8")).hexdigest()[:12]
+                issues.append(
+                    f"{path.name}: detector=/{pat}/ offset={m.start()} "
+                    f"len={m.end() - m.start()} sha256={digest}"
+                )
     return issues
 
 
@@ -254,7 +262,13 @@ def write_outputs(table_records, meta):
 
 # ---------- 数据获取（真实 / mock） ----------
 
-def fetch_real(cfg):
+def fetch_real(cfg, allow_missing_view=False):
+    """真实拉取飞书数据。
+
+    allow_missing_view=False（CI 默认）时，公开导出视图找不到即中止——
+    fail-closed，避免视图被重命名/误删后「降级为全表」把不该公开的记录导出去。
+    --no-view 仅存在于人工测试路径（传 allow_missing_view=True）。
+    """
     base_cfg = cfg["base"]
     for key in ("app_id_env", "app_secret_env", "app_token_env"):
         if base_cfg[key] not in os.environ:
@@ -269,13 +283,19 @@ def fetch_real(cfg):
         table_id = tables[table_name]
         view_id = resolve_view_id(token, base_cfg, table_id, base_cfg["export_view"])
         view_found[table_name] = view_id
+        if not view_id and not allow_missing_view:
+            raise RuntimeError(
+                f"缺少公开导出视图（fail-closed）: table={table_name!r} "
+                f"view={base_cfg['export_view']!r}——请检查飞书视图是否被重命名/误删"
+            )
         params = {}
         if view_id:
             params["view_id"] = view_id
         raw = api_get(token, base_cfg, f"/tables/{table_id}/records", **params)
         records[table_name] = [r.get("fields", {}) for r in raw]
     for name, vid in view_found.items():
-        print(f"  [表] {name} 视图「{base_cfg['export_view']}」: {'OK' if vid else '未找到(降级为全表)'}")
+        state = "OK" if vid else ("降级为全表(仅测试)" if allow_missing_view else "未找到")
+        print(f"  [表] {name} 视图「{base_cfg['export_view']}」: {state}")
     return records
 
 
@@ -299,7 +319,11 @@ def main():
         print("警告: --no-view 会绕过视图级防护，仅限本地测试。")
 
     print("① 拉取记录")
-    raw_tables = fetch_mock(cfg) if args.mock else fetch_real(cfg)
+    raw_tables = (
+        fetch_mock(cfg)
+        if args.mock
+        else fetch_real(cfg, allow_missing_view=args.no_view)
+    )
 
     print("② 白名单 DTO + 额度模糊化")
     table_records, table_configs = {}, {}
