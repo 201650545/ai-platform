@@ -14,6 +14,9 @@ config/
 __pycache__/
 *.pyc
 
+# 公开数据桥产物（CI 生成并部署到 GitHub Pages，不入库）
+public/
+
 # 系统
 .DS_Store
 Thumbs.db

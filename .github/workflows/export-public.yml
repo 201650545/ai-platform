@@ -1,0 +1,68 @@
+name: 公开数据桥导出
+
+# AI 自助资源运营体系 · 公开数据桥（方案书 §6.7）
+# 飞书 Bitable → 白名单 DTO → 额度模糊化 → 敏感扫描 → GitHub Pages
+# 敏感扫描失败即中止部署（git 历史不可逆）。
+
+on:
+  schedule:
+    # 每日 03:23（避开 :00 高峰；数据为 daily 层级）
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '强制重新拉取（跳过 build_id 变更检测）'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: public-data-bridge
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    environment:
+      # Pages 部署环境；Secret 从这里读取
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache-dir: ''
+      - name: 安装依赖（当前 exporter 纯 stdlib，预留扩展位）
+        run: python -c "import urllib.request, json, sys; print(sys.version)"
+
+      - name: 运行公开数据桥导出器
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+        run: python exporter/export.py
+
+      - name: 核对产物
+        run: |
+          test -f public/index.json || { echo "缺少 public/index.json"; exit 1; }
+          test -f public/capabilities.json || { echo "缺少 capabilities.json"; exit 1; }
+          test -f public/instances.json || { echo "缺少 instances.json"; exit 1; }
+          echo "产物齐全"
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
