@@ -58,9 +58,14 @@ curl -X POST http://127.0.0.1:8789/__admin/instances/mock-a-01/status \
   -H "Content-Type: application/json" -d '{"status":"额度耗尽"}'
 ```
 
-## 已知偏差（M2/M3 待补）
+## M2/M3 状态（已落地）
 
-1. `route_priority` 是 SQLite 运行态字段，seed 用 INSERT OR IGNORE 只首次写入——改配置 priority 需清 DB 或手工 UPDATE（M2 应对齐飞书配置真源做同步）
-2. 流式为「整读上游再透传」，长流式有缓冲；M3 应改逐块转发
-3. 请求级互斥锁，M1 吞吐有限；并发路由预留（原子状态预留）留待 M2
-4. `openai-compatible` 真实上游未接入实际凭证（key 空占位），M3 接飞书表2/表4 后启用
+- **M2 数据桥真源同步**（`sync.py`）：读数据桥产物（manifest 字节哈希校验）→ 字段映射 SQLite；退役能力过滤；`credential_id`/`route_priority` 走本地 `credential_map.json` 安全平面。用法：`python sync.py [--remote]` 后再启动调度器。
+- **M2 并发路由**：per-instance 原子预留（`reserve`/`release`）+ 原子扣减（`debit_atomic`）+ 启动清理残留预留。
+- **M3 真实上游 + 流式逐块**：`call_stream` SSE 逐行读转发（readline，不整读）；`stream_prepare` 流式前置预留。
+
+## 已知偏差（待办）
+
+1. **真实 key 空占位**：`credentials.json` 目前只有 `siliconflow-main`/`deepseek-main` 两个空 key 占位。真实 key 值需用户填入本地 `credentials.json`（受信平面）后，`openai-compatible` 真实转发才可用。
+2. 精确额度初始值在本地安全平面（数据桥只给区间）；运行时 SQLite 扣减为准。
+3. 调度器需先 `python sync.py` 同步数据桥产物，再启动 `python scheduler.py`。

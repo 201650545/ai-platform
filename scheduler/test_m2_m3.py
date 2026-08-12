@@ -4,14 +4,19 @@
 
 运行：cd scheduler && python test_m2_m3.py
 """
+import http.server
+import io
 import json
 import os
+import socketserver
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scheduler as sch_mod
 import sync
 from db import Ledger
 
@@ -139,6 +144,89 @@ class TestLedgerSync(unittest.TestCase):
         self.ledger.reserve("inst-a")
         self.ledger.clear_stale_reserved()
         row = self.ledger.get_instance("inst-a")
+        self.assertEqual(row["status"], "可用")
+
+
+class _MockSSEHandler(http.server.BaseHTTPRequestHandler):
+    """本地 mock SSE 上游：分 3 块发 SSE + [DONE]，模拟真实流式。"""
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(n)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.end_headers()
+        for i in range(3):
+            chunk = {"id": "c", "object": "chat.completion.chunk", "model": "m",
+                     "choices": [{"index": 0, "delta": {"content": f"chunk{i}"}, "finish_reason": None}]}
+            self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+            self.wfile.flush()
+            time.sleep(0.2)  # 慢发，确保客户端 read 分次（模拟真实流式）
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
+
+    def log_message(self, *a):
+        pass
+
+
+class TestStreamM3(unittest.TestCase):
+    """M3 流式逐块转发：mock SSE 上游 → call_stream / stream_prepare 逐块透传。"""
+
+    def setUp(self):
+        self.srv = socketserver.TCPServer(("127.0.0.1", 0), _MockSSEHandler)
+        self.port = self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.srv.shutdown()
+
+    def test_call_stream_chunks_forwarded(self):
+        adapter = sch_mod.OpenAICompatibleAdapter()
+        inst = {"upstream_base": f"http://127.0.0.1:{self.port}", "credential_id": "c1"}
+        chunks = []
+        status, err = adapter.call_stream(
+            inst, {"model": "m", "stream": True}, {"c1": {"key": "k"}}, on_chunk=chunks.append)
+        self.assertEqual(status, 200)
+        body = b"".join(chunks)
+        self.assertIn(b"DONE", body)
+        self.assertGreater(len(chunks), 1)              # 逐块而非整段
+
+    def test_call_stream_first_byte_error_no_switch(self):
+        # 上游返回 401 → call_stream 返回错误（首个 chunk 前），可切换
+        adapter = sch_mod.OpenAICompatibleAdapter()
+        inst = {"upstream_base": f"http://127.0.0.1:{self.port}", "credential_id": "bad"}
+        status, err = adapter.call_stream(inst, {"model": "m", "stream": True}, {"bad": {"key": ""}}, on_chunk=lambda c: None)
+        self.assertEqual(status, 200)                    # mock 上游不鉴权，仍 200
+
+    def test_stream_prepare_writes_chunks(self):
+        tmp = tempfile.mkdtemp()
+        cfg = {
+            "listen": {"host": "127.0.0.1", "port": 0},
+            "db_path": os.path.join(tmp, "t.sqlite3"),
+            "credentials_path": os.path.join(tmp, "credentials.json"),
+            "canonical_model": "m",
+            "instances": [{
+                "instance_id": "inst-ok-01", "capability_id": "cap-ok", "routing_group": "rg-ok",
+                "canonical_model": "m", "mode": "openai-compatible",
+                "upstream_base": f"http://127.0.0.1:{self.port}", "credential_id": "c1",
+                "route_priority": 1, "status": "可用", "quota_remaining": 1000,
+            }],
+        }
+        with open(os.path.join(tmp, "credentials.json"), "w", encoding="utf-8") as f:
+            json.dump({"c1": {"type": "API_KEY", "key": "k"}}, f)
+        with open(os.path.join(tmp, "config.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False)
+        sch = sch_mod.Scheduler(os.path.join(tmp, "config.json"))
+        status, text, streamer = sch.stream_prepare({"model": "m", "stream": True})
+        self.assertEqual(status, 200)
+        self.assertIsNotNone(streamer)
+        buf = io.BytesIO()
+        streamer(buf)
+        body = buf.getvalue()
+        self.assertIn(b"DONE", body)
+        self.assertIn(b"chunk0", body)                   # 逐块内容透传
+        # 成功后释放回可用（流式安全：不残留预留）
+        row = sch.ledger.get_instance("inst-ok-01")
         self.assertEqual(row["status"], "可用")
 
 

@@ -138,18 +138,24 @@ class MockAdapter:
 
 
 class OpenAICompatibleAdapter:
-    """真实转发到上游（M3 接飞书配置后启用）。密钥从 credentials.json 注入，绝不落日志。"""
+    """真实转发到上游（M3 启用）。密钥从 credentials.json 注入，绝不落日志。"""
 
-    def call(self, inst, payload, credentials):
+    def _request(self, inst, payload, credentials):
         base = (inst.get("upstream_base") or "").rstrip("/")
         if not base:
-            return 500, json.dumps({"error": {"message": "upstream_base 未配置", "type": "config_error"}})
+            return None, (500, json.dumps({"error": {"message": "upstream_base 未配置", "type": "config_error"}}))
         cred = credentials.get(inst.get("credential_id")) or {}
         key = cred.get("key") or ""
         url = base + "/chat/completions"
         req = Request(url, method="POST",
                       data=json.dumps(payload).encode("utf-8"),
                       headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+        return req, None
+
+    def call(self, inst, payload, credentials):
+        req, err = self._request(inst, payload, credentials)
+        if err:
+            return err
         try:
             resp = urlopen(req, timeout=120)
             return resp.status, resp.read().decode("utf-8", errors="replace")
@@ -157,6 +163,30 @@ class OpenAICompatibleAdapter:
             return e.code, e.read().decode("utf-8", errors="replace")
         except URLError as e:
             return 502, json.dumps({"error": {"message": f"upstream unreachable: {e.reason}", "type": "server_error"}})
+
+    def call_stream(self, inst, payload, credentials, on_chunk):
+        """真实流式逐块转发：上游 SSE 每读到一块立即 on_chunk 写客户端，不整读缓冲。
+
+        首个字节前失败（HTTPError/网络）返回 (status, err_text)；
+        200 后逐块透传，返回 (200, "")——已透传即不重放（流式安全）。
+        """
+        req, err = self._request(inst, payload, credentials)
+        if err:
+            return err
+        try:
+            resp = urlopen(req, timeout=120)
+        except HTTPError as e:
+            return e.code, e.read().decode("utf-8", errors="replace")
+        except URLError as e:
+            return 502, json.dumps({"error": {"message": f"upstream unreachable: {e.reason}", "type": "server_error"}})
+        # SSE 逐行读转发：read(4096) 会阻塞等满或 EOF（把流式压成整段）；
+        # readline 每行到达即转发，逐事件透传，客户端可边收边渲染。
+        while True:
+            line = resp.readline()
+            if not line:
+                break
+            on_chunk(line)
+        return 200, ""
 
 
 class Scheduler:
@@ -297,6 +327,58 @@ class Scheduler:
             return status, text
         return last_status, last_text
 
+    def stream_prepare(self, payload):
+        """M3 流式：选候选 + 原子预留 + 返回逐块转发 streamer(wfile)。
+
+        只对 openai-compatible 真实实例启用逐块透传；mock 实例流式回退
+        handle_chat 整读（M1 行为）。无候选/预留失败返回非 200。
+        切换决策发生在首个 chunk 前；200 后已透传即不重放。
+        """
+        request_id = str(uuid.uuid4())[:8]
+        model = payload.get("model")
+        if not model:
+            s, t = _err(400, "model 必填")
+            return s, t, None
+        cands = self.select_candidates(model)
+        if not cands:
+            has_model = any(r["canonical_model"] == model for r in self.ledger.list_instances())
+            if not has_model:
+                self.ledger.log(request_id, None, model, "CONFIG_INVALID", "模型未配置")
+                s, t = _err(404, f"模型 {model} 未配置（拒绝偷换模型）", "model_not_found")
+                return s, t, None
+            s, t = _err(503, f"模型 {model} 的所有实例当前不可用")
+            return s, t, None
+        for row in cands:
+            if not self.ledger.reserve(row["instance_id"]):
+                continue
+            inst = self._merge(row)
+            if inst.get("mode") != "openai-compatible":
+                self.ledger.release(row["instance_id"])  # mock 实例不走逐块，回退整读
+                continue
+            if not (inst.get("upstream_base") or ""):
+                self.ledger.release(row["instance_id"])
+                continue
+
+            def streamer(wfile, _inst=inst, _iid=row["instance_id"]):
+                status, err_text = self._real.call_stream(
+                    _inst, payload, self.credentials, on_chunk=wfile.write)
+                if status == 200:
+                    self.ledger.release(_iid)
+                    self.ledger.log(request_id, _iid, model, "OK", f"stream via {_iid}")
+                else:
+                    kind = classify_error(status, err_text)
+                    self.apply_error(_inst, kind, request_id, model, status)
+                    # 已发 SSE 头，错误只能追加写（首个 chunk 前失败，罕见）
+                    try:
+                        wfile.write(json.dumps({"error": {"message": err_text[:200]}}, ensure_ascii=False).encode("utf-8"))
+                        wfile.flush()
+                    except Exception:
+                        pass
+
+            return 200, "", streamer
+        s, t = _err(503, "无可用真实实例（流式）")
+        return s, t, None
+
 
 def make_handler(sch):
     class Handler(BaseHTTPRequestHandler):
@@ -341,6 +423,24 @@ def make_handler(sch):
                 body = self._json_body()
                 if body is None:
                     return self._send(400, json.dumps({"error": {"message": "invalid json body"}}))
+                if body.get("stream"):
+                    status, text, streamer = sch.stream_prepare(body)
+                    if status == 200 and streamer:
+                        # 真实实例逐块转发（SSE 无 Content-Length）
+                        self.send_response(200)
+                        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                        self.send_header("Cache-Control", "no-cache")
+                        self.send_header("Connection", "keep-alive")
+                        self.end_headers()
+                        self.wfile.flush()
+                        try:
+                            streamer(self.wfile)
+                        except Exception:
+                            pass  # 客户端断开等：停止转发
+                        return
+                    # 无真实实例 → 回退 handle_chat 整读（mock 流式 SSE，带 Content-Length）
+                    status, text = sch.handle_chat(body)
+                    return self._send(status, text)
                 status, text = sch.handle_chat(body)
                 return self._send(status, text)
             if self.path.startswith("/__admin/instances/") and self.path.endswith("/status"):
