@@ -7,6 +7,7 @@ import sqlite3
 import os
 import threading
 import json
+import datetime
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS instances (
@@ -71,6 +72,44 @@ class Ledger:
             cols = [d[0] for d in self._db.execute("SELECT * FROM instances").description]
             return [dict(zip(cols, r)) for r in rows]
 
+    # M2：数据桥真源同步——配置字段 upsert，运行态字段（status/quota/cooldown）保留
+    CONFIG_FIELDS = ["routing_group", "canonical_model", "mode", "upstream_base",
+                     "credential_id", "quota_unit", "route_priority", "config_version"]
+
+    def sync_instances(self, new_configs):
+        """按数据桥产物同步实例配置。
+
+        - 已存在实例：只 upsert 配置字段，不覆盖运行态（status/quota_remaining/cooldown_until）。
+        - 新实例：INSERT（初始 status 来自数据桥映射，quota_remaining 由调用方给出初始值）。
+        - 数据桥消失的实例：标记 status=失效（保留行与事件历史）。
+        """
+        with self._lock, self._db:
+            existing = {r[0] for r in self._db.execute("SELECT instance_id FROM instances").fetchall()}
+            for iid, c in new_configs.items():
+                if iid in existing:
+                    sets = ", ".join(f"{f}=?" for f in self.CONFIG_FIELDS)
+                    self._db.execute(
+                        f"UPDATE instances SET {sets} WHERE instance_id=?",
+                        (*[c.get(f) for f in self.CONFIG_FIELDS], iid))
+                else:
+                    self._db.execute(
+                        """INSERT OR IGNORE INTO instances
+                           (instance_id, capability_id, routing_group, canonical_model,
+                            mode, upstream_base, credential_id, status,
+                            quota_remaining, quota_unit, safety_margin, route_priority, config_version)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (iid, c.get("capability_id"), c.get("routing_group"),
+                         c.get("canonical_model"), c.get("mode", "openai-compatible"),
+                         c.get("upstream_base"), c.get("credential_id"),
+                         c.get("status", "可用"), c.get("quota_remaining", 0),
+                         c.get("quota_unit", "token"), c.get("safety_margin", 0),
+                         c.get("route_priority", 99), c.get("config_version", 1)))
+            gone = existing - set(new_configs)
+            for iid in gone:
+                self._db.execute(
+                    "UPDATE instances SET status='失效' WHERE instance_id=? AND status!='失效'", (iid,))
+            self._db.commit()
+
     def get_instance(self, instance_id):
         with self._lock, self._db:
             row = self._db.execute("SELECT * FROM instances WHERE instance_id=?", (instance_id,)).fetchone()
@@ -87,6 +126,48 @@ class Ledger:
     def set_quota(self, instance_id, remaining):
         with self._lock, self._db:
             self._db.execute("UPDATE instances SET quota_remaining=? WHERE instance_id=?", (remaining, instance_id))
+            self._db.commit()
+
+    # ---- M2 并发：per-instance 原子预留 ----
+
+    def reserve(self, instance_id):
+        """原子预留实例；仅当 status='可用' 且未冷却时才成功（并发下只有一个请求拿到）。"""
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+        with self._lock, self._db:
+            cur = self._db.execute(
+                "UPDATE instances SET status='预留' WHERE instance_id=? AND status='可用' "
+                "AND (cooldown_until IS NULL OR cooldown_until<=?)", (instance_id, now)).rowcount
+            self._db.commit()
+        return cur == 1
+
+    def release(self, instance_id):
+        """释放预留回「可用」（仅当当前仍为预留态，避免覆盖运行态）。"""
+        with self._lock, self._db:
+            self._db.execute("UPDATE instances SET status='可用' WHERE instance_id=? AND status='预留'",
+                             (instance_id,))
+            self._db.commit()
+
+    def clear_stale_reserved(self):
+        """启动清理：崩溃残留的『预留』态全部释放回『可用』。"""
+        with self._lock, self._db:
+            self._db.execute("UPDATE instances SET status='可用' WHERE status='预留'")
+            self._db.commit()
+
+    def debit_atomic(self, instance_id, cost):
+        """原子扣减额度：quota_remaining 在 SQL 层自减，避免并发双扣；扣到<=0 置额度耗尽。"""
+        if cost <= 0:
+            return
+        with self._lock, self._db:
+            cur = self._db.execute(
+                "UPDATE instances SET quota_remaining = quota_remaining - ? WHERE instance_id=?",
+                (cost, instance_id)).rowcount
+            if cur:
+                row = self._db.execute(
+                    "SELECT quota_remaining FROM instances WHERE instance_id=?", (instance_id,)).fetchone()
+                if row and row[0] <= 0:
+                    self._db.execute(
+                        "UPDATE instances SET status='额度耗尽' WHERE instance_id=? AND status!='额度耗尽'",
+                        (instance_id,))
             self._db.commit()
 
     def set_cooldown(self, instance_id, until_iso):

@@ -168,6 +168,7 @@ class Scheduler:
         if port:
             self.cfg["listen"]["port"] = port
         self.ledger = Ledger(self.cfg.get("db_path", "scheduler.sqlite3"))
+        self.ledger.clear_stale_reserved()  # M2：清理崩溃残留的『预留』态
         self.ledger.seed(self.cfg["instances"])
         self.credentials = self._load_credentials()
         self._mock = MockAdapter()
@@ -214,25 +215,20 @@ class Scheduler:
         cands.sort(key=lambda r: (r.get("route_priority", 99), -(r.get("quota_remaining") or 0)))
         return cands
 
-    def debit(self, inst, resp_text):
-        """扣减额度；200 里包错误时 resp_text 无 usage，跳过。硬停止：低于安全余量即不再候选。"""
-        cost = 0
+    @staticmethod
+    def _extract_cost(resp_text):
+        """从 200 响应提取 usage.total_tokens；无 usage / 解析失败返回 0。"""
         try:
             obj = json.loads(resp_text)
             if isinstance(obj, dict) and obj.get("usage"):
-                cost = obj["usage"].get("total_tokens", 0) or 0
+                return obj["usage"].get("total_tokens", 0) or 0
         except Exception:
-            cost = 0
-        if cost <= 0:
-            return
-        inst_id = inst["instance_id"]
-        row = self.ledger.get_instance(inst_id)
-        if not row:
-            return
-        remaining = max(0.0, (row.get("quota_remaining") or 0) - cost)
-        self.ledger.set_quota(inst_id, remaining)
-        if remaining <= 0:
-            self.ledger.set_status(inst_id, "额度耗尽")
+            pass
+        return 0
+
+    def debit(self, inst, resp_text):
+        """原子扣减额度（M2 并发安全：SQL 层自减，防双扣）；扣到<=0 自动置额度耗尽。"""
+        self.ledger.debit_atomic(inst["instance_id"], self._extract_cost(resp_text))
 
     def apply_error(self, inst, kind, request_id, model, status):
         iid = inst["instance_id"]
@@ -259,43 +255,47 @@ class Scheduler:
         model = payload.get("model")
         if not model:
             return _err(400, "model 必填")
-        with self._request_lock:
-            cands = self.select_candidates(model)
-            if not cands:
-                has_model = any(r["canonical_model"] == model for r in self.ledger.list_instances())
-                if not has_model:
-                    self.ledger.log(request_id, None, model, "CONFIG_INVALID", "模型未配置")
-                    return _err(404, f"模型 {model} 未配置（M1 仅支持已登记能力，拒绝偷换模型）", "model_not_found")
-                return _err(503, f"模型 {model} 的所有实例当前不可用（额度耗尽/冷却中/失效）")
-            last_status, last_text = 503, json.dumps({"error": {"message": "all instances failed"}})
-            for row in cands:
-                inst = self._merge(row)
-                try:
-                    if inst.get("mode") == "openai-compatible":
-                        status, text = self._real.call(inst, payload, self.credentials)
-                    else:
-                        status, text = self._mock.call(inst, payload)
-                except Exception as e:  # adapter 内部异常视为 5xx
-                    status, text = 500, json.dumps({"error": {"message": f"adapter error: {type(e).__name__}"}})
-                kind = classify_error(status, text)
-                if kind == "OK":
-                    self.debit(inst, text)
-                    self.ledger.log(request_id, inst["instance_id"], model, "OK",
-                                    f"http {status} via {inst['instance_id']}")
-                    return status, text
-                self.apply_error(inst, kind, request_id, model, status)
-                if kind in FATAL:
-                    return status, text
-                if kind in RETRYABLE:
-                    self.ledger.log(request_id, inst["instance_id"], model, "FAILOVER",
-                                    f"{kind} → 同能力下一实例")
-                    last_status, last_text = status, text
-                    continue
-                # OTHER：保守处理，标记冷却但不切换
-                self.ledger.set_status(inst["instance_id"], "冷却中")
-                self.ledger.set_cooldown(inst["instance_id"], now_iso(60))
+        cands = self.select_candidates(model)
+        if not cands:
+            has_model = any(r["canonical_model"] == model for r in self.ledger.list_instances())
+            if not has_model:
+                self.ledger.log(request_id, None, model, "CONFIG_INVALID", "模型未配置")
+                return _err(404, f"模型 {model} 未配置（M1 仅支持已登记能力，拒绝偷换模型）", "model_not_found")
+            return _err(503, f"模型 {model} 的所有实例当前不可用（额度耗尽/冷却中/失效）")
+        last_status, last_text = 503, json.dumps({"error": {"message": "all instances failed"}})
+        for row in cands:
+            # M2 并发：per-instance 原子预留；被并发占用则试下一个候选
+            if not self.ledger.reserve(row["instance_id"]):
+                continue
+            inst = self._merge(row)
+            try:
+                if inst.get("mode") == "openai-compatible":
+                    status, text = self._real.call(inst, payload, self.credentials)
+                else:
+                    status, text = self._mock.call(inst, payload)
+            except Exception as e:  # adapter 内部异常视为 5xx
+                status, text = 500, json.dumps({"error": {"message": f"adapter error: {type(e).__name__}"}})
+            kind = classify_error(status, text)
+            if kind == "OK":
+                self.debit(inst, text)                    # 原子扣减
+                self.ledger.release(inst["instance_id"])  # 释放预留回「可用」
+                self.ledger.log(request_id, inst["instance_id"], model, "OK",
+                                f"http {status} via {inst['instance_id']}")
                 return status, text
-            return last_status, last_text
+            # 失败：apply_error 写状态（覆盖预留态，等价释放）
+            self.apply_error(inst, kind, request_id, model, status)
+            if kind in FATAL:
+                return status, text
+            if kind in RETRYABLE:
+                self.ledger.log(request_id, inst["instance_id"], model, "FAILOVER",
+                                f"{kind} → 同能力下一实例")
+                last_status, last_text = status, text
+                continue
+            # OTHER：保守处理，标记冷却但不切换
+            self.ledger.set_status(inst["instance_id"], "冷却中")
+            self.ledger.set_cooldown(inst["instance_id"], now_iso(60))
+            return status, text
+        return last_status, last_text
 
 
 def make_handler(sch):
