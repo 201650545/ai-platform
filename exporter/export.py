@@ -290,6 +290,21 @@ def write_outputs(table_records, meta):
     (OUTPUT_DIR / "schema.json").write_text(
         json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    # manifest.json ——「提交点」：先写完全部数据文件、最后写 manifest。
+    # 哈希的是实际写盘字节（Path.read_bytes），与消费端 r.content 原始字节同口径；
+    # 消费端逐文件 sha256 比对，自证「四文件同属一个 build」（fail-closed）。
+    files = {}
+    for name in ("index.json", "capabilities.json", "instances.json", "schema.json"):
+        files[name] = {"sha256": hashlib.sha256((OUTPUT_DIR / name).read_bytes()).hexdigest()}
+    manifest = {
+        "bridge_version": meta["bridge_version"],
+        "build_id": meta["build_id"],
+        "generated_at": meta["generated_at"],
+        "files": files,
+    }
+    (OUTPUT_DIR / "manifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
     return index
 
 

@@ -21,6 +21,7 @@
   python exporter/validate.py --force                # 人工确认后跳过数量突变阻断
 """
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -39,6 +40,33 @@ _RE_KNOWN_KEY = re.compile(r"(?i)\b(?:sk-|sk_|ghp_|gho_|github_pat_|xox[bap]-|AK
 _RE_URL_QUERY = re.compile(r"[?&][A-Za-z0-9_\-]{2,}=[A-Za-z0-9%_\-\.~+/]{8,}")
 _RE_EMAIL = re.compile(r"(?<!\w)[\w.+-]{1,}@[\w-]{1,}\.[\w.-]{2,}(?!\w)")
 _RE_PHONE_CN = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
+
+
+def check_manifest():
+    """manifest.json 提交点自检：files 声明与磁盘文件字节哈希必须一致。
+
+    协议升级（方案书 v2 §2.1）：manifest 是消费端 fail-closed 的依据，
+    声明与实盘不一致即视为发布故障，禁止部署。
+    """
+    issues = []
+    m_path = OUTPUT_DIR / "manifest.json"
+    if not m_path.exists():
+        return ["manifest.json 缺失——本次导出未生成提交点，禁止部署"]
+    try:
+        manifest = json.loads(m_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return [f"manifest.json 解析失败: {e}"]
+    declared = manifest.get("files") or {}
+    for name in ("index.json", "capabilities.json", "instances.json", "schema.json"):
+        expected = (declared.get(name) or {}).get("sha256")
+        if not expected:
+            issues.append(f"manifest.files 缺 {name} 声明")
+            continue
+        actual = hashlib.sha256((OUTPUT_DIR / name).read_bytes()).hexdigest()
+        if actual != expected:
+            issues.append(
+                f"manifest.files[{name}] 哈希不一致（声明 {expected[:12]}… 实际 {actual[:12]}…）")
+    return issues
 
 
 def load_config():
@@ -227,12 +255,15 @@ def main():
             for it in drop_issues:
                 print(f"    {it}")
 
+    # 8) manifest 提交点自检（方案书 v2 §2.1）
+    all_issues += check_manifest()
+
     if all_issues:
         for it in all_issues:
             print(f"  {it}")
         print("校验未通过——中止部署。")
         sys.exit(1)
-    print("校验通过（count/主键/引用/字段集/枚举/值形状/数量突变）")
+    print("校验通过（count/主键/引用/字段集/枚举/值形状/数量突变/manifest）")
 
 
 if __name__ == "__main__":
