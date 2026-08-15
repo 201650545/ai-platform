@@ -106,11 +106,97 @@ opencli browser <session> eval $js2
 
 ---
 
-## 附：opencli eval 传参引号规则（本次踩坑）
+
+---
+
+## 8. 详细步骤（2026-08-15 实测精化版，含全部踩坑细节）
+
+> 上一版是「大概流程」。本节是逐步可复制的详细操作，含每个环节的确切命令/表达式与坑。执行时仍以页面实际为准（账号池/域名会变）。
+
+### 8.1 完整流程一览（一步步照做）
+
+**① 打开问答宝账号池**
+```bash
+node "D:\opencli-app\dist\src\main.js" browser n8hh7hyn open "https://ai.wendabao-f.net/?utm_source=hidden-ncn"
+# 等待 5 秒（页面 SPA 加载）
+```
+
+**② 读账号池，选健康 Plus 账号**
+```js
+// eval：列出 isHealthy=true 且 badge=PLUS 的 carID（如 vip-11 / vip-19 / vip-48）
+(()=>{const raw=localStorage.getItem('panelAccountList');if(!raw)return JSON.stringify({err:'no panel'});try{const list=JSON.parse(raw);const ok=list.filter(a=>a.isHealthy===true&&(a.badge||a.plan)==='PLUS').map(a=>({carID:a.carID,badge:a.badge||a.plan}));return JSON.stringify({total:list.length,healthy:ok.slice(0,6)})}catch(e){return JSON.stringify({err:e.message})}})()
+```
+> 选号原则：优先 isHealthy=true 的 Plus。账号池会漂移（上次健康下次可能失效），每次先读。
+
+**③ localStorage 登录法导航到目标实例**
+```js
+// 替换 vip-11 为你选的账号。注意：此 URL 含 jwt，**不落盘、不写记忆、不外发**
+(()=>{const t=localStorage.getItem('authToken');if(!t)return 'NO_TOKEN';location.href='https://vip-11.67673.live/api/v2/plus-login?account=vip-11&jwt='+encodeURIComponent(t);return 'NAVIGATING'} )()
+```
+> 导航后等 10-12 秒（页面重载慢），再 `browser state` 确认 URL 变为 `https://vip-11.67673.live/`。
+> ⚠️ 若 state 报 `getAttribute null` = 页面还在加载，等几秒再查（手册附录已有）。
+
+**④ 设置 Thinking•Extended（关键！模型菜单点击必须用完整事件序列）**
+
+> ⚠️⚠️ **这是「点不动」的根因（2026-08-15 实测）**：ChatGPT 的模型菜单是自定义下拉框，监听 pointer/mouse down+up。**el.click() 或简单 dispatchEvent(click) 都不会弹菜单**（opencli 的 `click <ref>` 也常失败，因为它的 nativeClick 可能被 fallback 或坐标在文字上）。必须用 **pointerdown→mousedown→pointerup→mouseup→click 完整序列 + 真实坐标**，且目标要指向 **Auto 文字右侧的向下箭头 svg**（不是 Auto 文字本身）。
+
+```js
+// ① 点 Auto pill 里的箭头 svg（完整事件序列）
+(()=>{const b=Array.from(document.querySelectorAll('button')).find(x=>x.querySelector('span')&&x.querySelector('span').textContent.trim()==='Auto');if(!b)return 'no auto';const svg=b.querySelector('svg');const el=svg||b;const r=el.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;const opts={bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y,button:0,buttons:1,pointerId:1,pointerType:'mouse',isPrimary:true,view:window};for(const[type,Ctor]of[['pointerdown',PointerEvent],['mousedown',MouseEvent],['pointerup',PointerEvent],['mouseup',MouseEvent],['click',MouseEvent]]){el.dispatchEvent(new Ctor(type,opts))}return 'arrow clicked'})()
+```
+
+```js
+// ② 等 3 秒后点 Thinking•Extended（同样用完整事件序列；testid=model-switcher-gpt-5-6-thinking）
+(()=>{const el=document.querySelector('[data-testid=model-switcher-gpt-5-6-thinking]');if(!el)return 'not found';const r=el.getBoundingClientRect();const x=r.x+r.width/2,y=r.y+r.height/2;const opts={bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y,button:0,buttons:1,pointerId:1,pointerType:'mouse',isPrimary:true,view:window};for(const[type,Ctor]of[['pointerdown',PointerEvent],['mousedown',MouseEvent],['pointerup',PointerEvent],['mouseup',MouseEvent],['click',MouseEvent]]){el.dispatchEvent(new Ctor(type,opts))}return 'thinking selected'})()
+```
+
+```js
+// ③ 验证 composer 已显示 Extended（= Thinking•Extended 生效，思考程度已是 Extended）
+(()=>{const spans=Array.from(document.querySelectorAll('span')).filter(s=>s.textContent.trim()==='Extended'&&s.childElementCount===0);return JSON.stringify({extended:spans.length>0})})()
+```
+
+> 坑：部分实例（vip-19 等）模型菜单可能整体打不开（点了无反应）→ 换健康账号重登（手册 §7.2）。「有无 Auto pill」因实例而异：vip-11 有 pill，vip-13/48 可能没有（默认模型）。
+
+**⑤ 注入提示词（base64 + contenteditable insertText）**
+
+> ⚠️ 提示词尽量用**内嵌版**（把 GitHub 链接内容直接贴进正文，只留 1 个主链接）——**多链接提示词会触发 Deep Research 空回复**（手册 §7.1）：user 消息发出但 assistant 只有 "Show more"，0 字回复。内嵌版实测可靠。
+
+```bash
+# PowerShell：读提示词文件 → base64
+$c = Get-Content "提示词文件.md" -Raw -Encoding UTF8
+$b = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($c))
+```
+
+```js
+// eval 注入到 contenteditable（外层双引号、JS 内单引号；base64 串嵌入）
+(()=>{const b=atob('BASE64');const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const s=new TextDecoder().decode(u);const ce=document.querySelector('#prompt-textarea[contenteditable=true]')||document.querySelector('[contenteditable=true]');ce.focus();ce.innerHTML='';document.execCommand('insertText',false,s);return JSON.stringify({len:ce.innerText.length})})()
+```
+> 校验 len>0 且尾部正确；若 len=0 说明是 textarea 模式（少见），改用 native value setter（手册 §4）。
+
+**⑥ 发送**
+```js
+(()=>{const s=document.querySelector('[data-testid=send-button]');if(s&&!s.disabled){s.click();return 'sent'};return JSON.stringify({send:!!s,disabled:s?s.disabled:null})})()
+```
+
+**⑦ 等待生成 + 提取回复（轮询脚本有坑，见 8.2）**
+
+### 8.2 轮询/提取的坑（2026-08-15 实测）
+
+- **轮询探针可能误判**：用 `[data-testid=stop-button]` 探针轮询时，若某次 eval 探针报错（execFileSync 抛异常被 catch），脚本会误跳过真正完成的瞬间；或 stop 按钮选择器不匹配导致一直显示生成中。**内容其实已生成**。
+- **正确做法**：不要只信轮询的 stop 状态。等待一段时间后**直接提取 assistant 消息**确认：
+```js
+// 提取最后一条 assistant 完整文本（无内容 = 空回复/还在生成）
+(()=>{const msgs=document.querySelectorAll('[data-message-author-role=assistant]');const last=msgs[msgs.length-1];return last?(last.innerText||last.textContent||'').trim():''})()
+```
+- **空回复判定**：assistant 长度 0 或只有 "Show more" + 引用标记（GitHub +N）= 空回复（Deep Research 触发）→ 换内嵌版提示词重试，或转 Claude。
+- **推荐流程**：发送后直接 sleep 90-120 秒（Thinking•Extended 通常 2-5 分钟），再提取；若 0 字再等再试，不用复杂轮询。
+
+### 8.3 opencli eval 传参引号规则（沿用 + 补充）
 
 | 场景 | 正确写法 |
 |------|---------|
 | eval 传 JS | PowerShell **外层双引号**，JS **内部全部单引号**（选择器用 `'[...]'`） |
-| JS 含双引号 | 会拆散参数（报 `too many arguments` / `Invalid left-hand side`），避免 |
-| 页面加载中 state | 报 `getAttribute null` → 等几秒再 `state` |
-| 长文本 | 一律 base64，勿直接塞命令行 |
+| JS 含双引号 | 会拆散参数，避免 |
+| 页面加载中 state | 报 getAttribute null → 等几秒再 state |
+| 长文本/复杂 JS | 一律写 .mjs 临时脚本用 execFileSync 调 opencli（比 PowerShell 内联可靠），用完删除 |
+| 完整事件序列 | 模型菜单等自定义下拉必须 pointerdown/mousedown/pointerup/mouseup/click 全发，单 click 无效 |
