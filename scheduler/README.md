@@ -1,7 +1,18 @@
 # M1 最小闭环调度器
 
 单进程 + SQLite(WAL) + localhost base_url 代理。
-1 canonical model × 2 实例 × 2 凭证。
+多 canonical model × 多厂商实例 × 多凭证（免费/低价优先，额度耗尽自动切换）。
+
+当前实例池（config.json，route_priority 升序 = 消耗顺序，免费/低价优先）：
+- **deepseek-v4-flash**：ZenMux免费(1) → opencode-go(10) → 魔塔(20) → 商汤(30) → ZSCC(40) → 硅基(50,余额0跳过) → OpenRouter(60) → DeepSeek官方(70)
+- **glm-5.2**：魔塔(20) → 商汤(30) → ZSCC(40) → 硅基(50,余额0跳过) → OpenRouter(60)
+> 厂商 key 统一经 scheduler/credentials.json 读取（源自 C:/Users/郭永涛/.dsh/.credentials.yaml）；
+> 硅基流动实测余额不足，已置 quota_remaining=0 直接跳过（免 402 白试）；
+> 转发需带浏览器 UA（默认 urllib UA 会被 opencode.go/OpenRouter 等 403 拦截，已修复）。
+
+> 模型名映射：canonical_model 是统一逻辑名（客户端请求名）；各厂商实际名不同，
+> 由实例的 actual_model 字段在转发前改写（如 siliconflow 的 deepseek-ai/DeepSeek-V4-Flash、
+> openrouter 的 deepseek/deepseek-v4-flash）。
 
 ## 快速开始
 

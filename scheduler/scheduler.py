@@ -147,9 +147,16 @@ class OpenAICompatibleAdapter:
         cred = credentials.get(inst.get("credential_id")) or {}
         key = cred.get("key") or ""
         url = base + "/chat/completions"
+        # 带标准浏览器 UA：部分上游（opencode.go / OpenRouter / Cloudflare 网关）
+        # 会拦截 Python-urllib 的默认 UA（403/1010），显式声明一个常规 UA 避免风控。
         req = Request(url, method="POST",
                       data=json.dumps(payload).encode("utf-8"),
-                      headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+                      headers={
+                          "Authorization": f"Bearer {key}",
+                          "Content-Type": "application/json",
+                          "User-Agent": "dsh-scheduler/0.1 (OpenAI-compatible)",
+                          "Accept": "application/json",
+                      })
         return req, None
 
     def call(self, inst, payload, credentials):
@@ -224,7 +231,7 @@ class Scheduler:
         """SQLite 运行态行 + config 配置（mock 行为/上游/凭证）"""
         merged = dict(row)
         c = self._inst_config().get(row["instance_id"], {})
-        for k in ("mode", "mock_fail", "upstream_base", "credential_id"):
+        for k in ("mode", "mock_fail", "upstream_base", "credential_id", "actual_model"):
             if k in c:
                 merged[k] = c[k]
         return merged
@@ -298,11 +305,17 @@ class Scheduler:
             if not self.ledger.reserve(row["instance_id"]):
                 continue
             inst = self._merge(row)
+            # 转发前按实例的实际厂商模型名改写 payload（canonical_model 是统一逻辑名；
+            # 各厂商实际名不同，如 siliconflow 需 deepseek-ai/DeepSeek-V4-Flash）。
+            upstream_payload = payload
+            if inst.get("actual_model") and inst["actual_model"] != payload.get("model"):
+                upstream_payload = dict(payload)
+                upstream_payload["model"] = inst["actual_model"]
             try:
                 if inst.get("mode") == "openai-compatible":
-                    status, text = self._real.call(inst, payload, self.credentials)
+                    status, text = self._real.call(inst, upstream_payload, self.credentials)
                 else:
-                    status, text = self._mock.call(inst, payload)
+                    status, text = self._mock.call(inst, upstream_payload)
             except Exception as e:  # adapter 内部异常视为 5xx
                 status, text = 500, json.dumps({"error": {"message": f"adapter error: {type(e).__name__}"}})
             kind = classify_error(status, text)
@@ -359,9 +372,15 @@ class Scheduler:
                 self.ledger.release(row["instance_id"])
                 continue
 
-            def streamer(wfile, _inst=inst, _iid=row["instance_id"]):
+            # 流式同样按实例实际模型名改写（与 handle_chat 一致）。
+            upstream_payload = payload
+            if inst.get("actual_model") and inst["actual_model"] != payload.get("model"):
+                upstream_payload = dict(payload)
+                upstream_payload["model"] = inst["actual_model"]
+
+            def streamer(wfile, _inst=inst, _iid=row["instance_id"], _up=upstream_payload):
                 status, err_text = self._real.call_stream(
-                    _inst, payload, self.credentials, on_chunk=wfile.write)
+                    _inst, _up, self.credentials, on_chunk=wfile.write)
                 if status == 200:
                     self.ledger.release(_iid)
                     self.ledger.log(request_id, _iid, model, "OK", f"stream via {_iid}")
