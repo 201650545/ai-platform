@@ -3,8 +3,8 @@
 """三端同步编排：GitHub ↔ 本地 ↔ 飞书
 
 方向：
-  GitHub → 本地   git pull --ff-only（只快进，绝不 force）
-  本地 → GitHub   git add -A + commit + push（提交前敏感扫描，命中即跳过）
+  GitHub → 本地   git pull --rebase（只快进/重放，绝不 force；冲突自动中止待人工）
+  本地 → GitHub   先敏感扫描 → git add -A + commit → push
   飞书 → 本地     运行 feishu_exports 配置的导出命令（缺环境变量则跳过）
 
 用法：
@@ -35,11 +35,14 @@ def now_str():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def run(cmd, cwd=None):
+def run(cmd, cwd=None, env=None):
     """执行命令，返回 (returncode, stdout, stderr)。"""
+    e = dict(os.environ)
+    if env:
+        e.update(env)
     try:
         p = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=300)
+                           encoding="utf-8", errors="replace", timeout=600, env=e)
         return p.returncode, (p.stdout or "").strip(), (p.stderr or "").strip()
     except FileNotFoundError:
         return 127, "", f"命令不存在: {cmd[0]}"
@@ -52,13 +55,6 @@ def load_config():
         return json.load(f)
 
 
-def load_log():
-    if not os.path.exists(LOG_PATH):
-        return []
-    with open(LOG_PATH, encoding="utf-8") as f:
-        return [ln for ln in f.read().splitlines() if ln.strip()]
-
-
 def append_log(entries):
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         for e in entries:
@@ -66,7 +62,7 @@ def append_log(entries):
 
 
 def secret_scan(repo, patterns):
-    """对工作区已跟踪/未跟踪文本文件做敏感扫描。命中返回 [(file, pattern)]。"""
+    """对工作区文本文件做敏感扫描。命中返回 [(file, pattern)]。"""
     code, out, _ = run([GIT, "status", "--porcelain", "-z"], cwd=repo["path"])
     if code != 0:
         return []
@@ -90,49 +86,68 @@ def secret_scan(repo, patterns):
         except OSError:
             continue
         for pat in patterns:
-            m = re.search(pat, content)
-            if m:
+            if re.search(pat, content):
                 hits.append((path, pat))
                 break
     return hits
 
 
-def git_pull(repo, dry):
-    if dry:
-        return "dry", "（dry-run 不执行）"
-    code, out, err = run([GIT, "pull", "--ff-only"], cwd=repo["path"])
-    if code == 0:
-        return "ok", out.splitlines()[-1] if out else "已最新"
-    return "fail", (err or out)[:300]
+def sync_repo(repo, patterns, dry, do_pull, do_push):
+    """单仓库三端同步：本地改动→commit → pull --rebase → push。"""
+    name = repo["name"]
+    out = []
 
-
-def git_push(repo, patterns, dry):
-    code, _, _ = run([GIT, "status", "--porcelain"], cwd=repo["path"])
+    code, status, _ = run([GIT, "status", "--porcelain"], cwd=repo["path"])
     if code != 0:
-        return "fail", "git status 失败"
-    out = run([GIT, "status", "--porcelain"], cwd=repo["path"])[1]
-    if not out.strip():
-        return "clean", "无待提交改动"
+        return [f"- {name}: [fail] git status 失败"]
+    has_local = bool(status.strip())
 
-    hits = secret_scan(repo, patterns)
-    if hits:
-        files = ", ".join(h for h, _ in hits[:5])
-        return "blocked", f"敏感扫描命中 {len(hits)} 处（如 {files}），跳过提交"
+    # ---- 1. 本地改动 → commit（含敏感扫描）----
+    if has_local and do_push:
+        hits = secret_scan(repo, patterns)
+        if hits:
+            files = ", ".join(h for h, _ in hits[:5])
+            return [f"- {name}: [blocked] 敏感扫描命中 {len(hits)} 处（如 {files}），跳过提交"]
+        if dry:
+            out.append(f"- {name}: [dry] 将提交 {len(status.splitlines())} 个文件")
+        else:
+            if run([GIT, "add", "-A"], cwd=repo["path"])[0] != 0:
+                return [f"- {name}: [fail] git add 失败"]
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+            code, _, err = run([GIT, "commit", "-m", f"sync(三端): 本地→GitHub 自动同步 {stamp}"],
+                               cwd=repo["path"])
+            if code != 0:
+                return [f"- {name}: [fail] commit 失败: {(err or '')[:300]}"]
+            out.append(f"- {name}: [ok] 已提交本地改动")
+    elif has_local and not do_push and do_pull:
+        out.append(f"- {name}: [warn] 有未提交改动，pull 前请先 --push")
 
-    if dry:
-        return "dry", f"将提交 {len(out.splitlines())} 个文件（dry-run 不执行）"
+    # ---- 2. GitHub → 本地（pull --rebase）----
+    if do_pull:
+        if dry:
+            out.append(f"- {name}: [dry] 将 pull --rebase")
+        else:
+            code, o, e = run([GIT, "pull", "--rebase"], cwd=repo["path"],
+                             env={"GIT_EDITOR": "true"})
+            if code != 0:
+                run([GIT, "rebase", "--abort"], cwd=repo["path"])
+                out.append(f"- {name}: [fail] pull 冲突，已中止 rebase（{(e or o)[:200]}）")
+            else:
+                last = [ln for ln in o.splitlines() if ln.strip()]
+                out.append(f"- {name}: [ok] pull 完成" + (f"（{last[-1]}）" if last else ""))
 
-    if run([GIT, "add", "-A"], cwd=repo["path"])[0] != 0:
-        return "fail", "git add 失败"
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-    msg = f"sync(三端): 本地→GitHub 自动同步 {stamp}"
-    code, _, err = run([GIT, "commit", "-m", msg], cwd=repo["path"])
-    if code != 0:
-        return "fail", (err or "commit 失败")[:300]
-    code, out, err = run([GIT, "push"], cwd=repo["path"])
-    if code != 0:
-        return "fail", (err or out)[:300]
-    return "ok", f"已提交并推送（{stamp}）"
+    # ---- 3. 本地 → GitHub（push）----
+    if do_push:
+        if dry:
+            out.append(f"- {name}: [dry] 将 push")
+        else:
+            code, o, e = run([GIT, "push"], cwd=repo["path"])
+            if code != 0:
+                out.append(f"- {name}: [fail] push 失败: {(e or o)[:200]}")
+            else:
+                out.append(f"- {name}: [ok] 已推送")
+
+    return out
 
 
 def run_feishu_export(exp, dry):
@@ -169,19 +184,12 @@ def main():
     lines = [f"## {now_str()} 三端同步"]
     results = []
 
-    if do_pull or do_push:
-        for repo in cfg.get("repos", []):
-            if not repo.get("enabled"):
-                continue
-            if only and repo["name"] not in only:
-                continue
-            name = repo["name"]
-            if do_pull:
-                st, msg = git_pull(repo, args.dry_run)
-                results.append(f"- pull  {name}: [{st}] {msg}")
-            if do_push:
-                st, msg = git_push(repo, patterns, args.dry_run)
-                results.append(f"- push  {name}: [{st}] {msg}")
+    for repo in cfg.get("repos", []):
+        if not repo.get("enabled"):
+            continue
+        if only and repo["name"] not in only:
+            continue
+        results.extend(sync_repo(repo, patterns, args.dry_run, do_pull, do_push))
 
     if do_feishu:
         for exp in cfg.get("feishu_exports", []):
