@@ -17,6 +17,9 @@ __pycache__/
 # 公开数据桥产物（CI 生成并部署到 GitHub Pages，不入库）
 public/
 
+# 控制平面运行时产物（设计 §5：runtime 全部 gitignored）
+runtime/
+
 # 系统
 .DS_Store
 Thumbs.db
