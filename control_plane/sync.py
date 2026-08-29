@@ -472,8 +472,20 @@ def main():
                         help="常驻轮询（默认 60s；阶段5：租约+三类退避+熔断）")
     parser.add_argument("--clear-halt", action="store_true",
                         help="解除毒 candidate 熔断 halted（Q4 唯一解除途径）")
+    parser.add_argument("--daemon", action="store_true",
+                        help="无窗口运行（pythonw 计划任务用）：stdout/stderr "
+                             "重定向到 CP_DIR/loop_out.log")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     args = parser.parse_args()
+
+    if args.daemon:
+        # pythonw 下 sys.stdout 为 None，print 会 AttributeError 带死循环；
+        # 重定向到文件后 print/traceback 全部落盘
+        state_mod.ensure_dirs()
+        out = open(state_mod.CP_DIR / "loop_out.log", "a", encoding="utf-8",
+                   buffering=1)
+        sys.stdout = out
+        sys.stderr = out
 
     if args.clear_halt:
         return _clear_halt()
