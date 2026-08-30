@@ -9,14 +9,16 @@
   - credential_ref = 按「平台名」join 账号资产汇总：
       在用 且 LOGGED_IN → cred:{account_id}
       否则 → cred:pending:{instance_id}（P4.3 前不会真正被解析）
-  - status     = 实例表.状态 映射（待验证/额度耗尽 → paused，冷却中 → draining，失效 → disabled）
+  - status     = 实例表.状态 映射（待验证/额度耗尽 → paused，冷却中 → draining，失效 → disabled）；
+                 config.QUARANTINED_INSTANCES 命中的实例覆盖为 quarantined（显式人为隔离，
+                 资源级 deny，R5 终裁 c+）并附 quarantine_reason
   - capabilities 一律 unknown（fail-closed，P4.6 才外移能力矩阵）
 """
 import json
 import re
 from pathlib import Path
 
-from .config import RAW_DIR
+from .config import RAW_DIR, QUARANTINED_INSTANCES
 
 _RPM_RE = re.compile(r"(\d+)\s*rpm", re.IGNORECASE)
 
@@ -113,6 +115,12 @@ def _build_resource(cap, inst, account):
     if status == "active" and cap_status not in ("可用", None):
         status = _CAP_STATUS.get(cap_status, status)
 
+    # 显式资源级 quarantine（config.QUARANTINED_INSTANCES）：覆盖一切派生状态。
+    # 资源级 deny——该实例编译出的所有配对（含未来新增模型映射）默认隔离。
+    quarantine_reason = QUARANTINED_INSTANCES.get(instance_id)
+    if quarantine_reason:
+        status = "quarantined"
+
     credential_ref, credential_pending = None, True
     if account is not None:
         acct_status = _first(account["fields"].get("状态"))
@@ -131,6 +139,7 @@ def _build_resource(cap, inst, account):
         "credential_ref": credential_ref,
         "credential_pending": credential_pending,
         "status": status,
+        "quarantine_reason": quarantine_reason,
         "expiry_at": _expiry_iso(inst["fields"].get("额度到期日")),
         "limits": {
             "rpm": _parse_rpm(inst["fields"].get("限速")),

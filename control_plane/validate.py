@@ -50,13 +50,18 @@ def _check_capability(errors, r):
 
 def _check_lifecycle(errors, r):
     status = r.get("status")
-    if status not in ("active", "paused", "draining", "disabled"):
+    if status not in ("active", "paused", "draining", "disabled", "quarantined"):
         errors.append(f"{r['resource_id']}: status 非法={status!r}")
     exp = r.get("expiry_at")
     if exp is not None and not re.match(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:?\d{2})?)?$", str(exp)):
         errors.append(f"{r['resource_id']}: expiry_at 非法={exp!r}")
     if status == "disabled" and r.get("eligible_hint"):
         errors.append(f"{r['resource_id']}: disabled 资源不得标记可路由")
+    if status == "quarantined":
+        if not (r.get("quarantine_reason") or "").strip():
+            errors.append(f"{r['resource_id']}: quarantined 缺少 quarantine_reason（显式隔离必须可审计）")
+        if r.get("eligible_hint"):
+            errors.append(f"{r['resource_id']}: quarantined 资源不得标记可路由")
 
 
 def _check_security(errors, warnings, r):

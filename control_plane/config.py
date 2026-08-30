@@ -64,6 +64,18 @@ SENSITIVE_FIELDS = {
 }
 
 
+# 显式资源级 quarantine（R5 终裁 c+，GPT 2026-08-29）：
+# 在此列出的 instance 编译出的所有配对一律 status=quarantined（资源级 deny——
+# 该实例未来新增任何模型映射同样默认隔离），直到最小验证通过并从此处移除。
+# 注意：quarantine ≠ paused（不是数据缺失的兜底，而是人为风险隔离的显式语义）。
+QUARANTINED_INSTANCES = {
+    "cap-aliyun-01": (
+        "R5 数据冲突终裁 c+（GPT 2026-08-29）：额度有效期记录矛盾（90/180 天）+ "
+        "qwen3.8 系模型映射未经验证；解除前需对目标模型做真实 chat 验证且必须落 dashscope 渠道"
+    ),
+}
+
+
 def allowed_fields(table_name):
     """某表最终允许读取的字段（allowlist 再剔除敏感字段）。"""
     return [f for f in FIELD_ALLOWLIST.get(table_name, []) if f not in SENSITIVE_FIELDS]
