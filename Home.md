@@ -1,6 +1,6 @@
 # Home · ai-platform
 
-> 主仓 = ai-platform（本地 `D:\AI平台`），**仓库根即 Obsidian vault**。本文档是人/陌生 Agent 的统一入口。全仓人看层中文命名；机器路径保留英文（见 [[03-规格与规范]] §二）。
+> 主仓 = ai-platform（本地 `D:\Work\AI平台`），**仓库根即 Obsidian vault**。本文档是人/陌生 Agent 的统一入口。全仓人看层中文命名；机器路径保留英文（见 [[03-规格与规范]] §二）。
 
 ## 入口
 
