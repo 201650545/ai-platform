@@ -49,7 +49,7 @@ jobs:
 
       - name: 语义校验（含数量突变检测）
         # --baseline 拉线上 index.json：与上一成功版本比较记录数下降 >30% 阻断
-        run: python exporter/validate.py --baseline https://201650545.github.io/ai-resource-hub/index.json
+        run: python exporter/validate.py --baseline https://201650545.github.io/ai-platform/resource-ops/index.json
 
       - name: 比较 build_id（数据未变化则跳过部署）
         id: changed

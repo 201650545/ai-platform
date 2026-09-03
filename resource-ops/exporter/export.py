@@ -261,7 +261,7 @@ def write_outputs(table_records, meta):
     instances = table_records.get("instances", [])
     index = {
         "site": "AI 自助资源运营体系 · 公开数据桥",
-        "repo": "https://github.com/201650545/ai-resource-hub",
+        "repo": "https://github.com/201650545/ai-platform/tree/main/resource-ops",
         "bridge_version": meta["bridge_version"],
         "build_id": meta["build_id"],
         "generated_at": meta["generated_at"],

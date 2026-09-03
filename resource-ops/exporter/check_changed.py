@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LOCAL_INDEX = REPO_ROOT / "public" / "index.json"
-ONLINE_INDEX = "https://201650545.github.io/ai-resource-hub/index.json"
+ONLINE_INDEX = "https://201650545.github.io/ai-platform/resource-ops/index.json"
 
 
 def main():

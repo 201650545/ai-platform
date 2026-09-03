@@ -5,7 +5,7 @@ RUN_JS = "C:/Users/郭永涛/.workbuddy/binaries/node/versions/22.22.2/node_modu
 APP = "StmDbTXQWaujshs9NpIc3UFpnAc"
 TID = "tbl79Mb2OWZV1g5T"
 
-ROOT = "D:/ai-resource-hub/docs/资源调研"
+ROOT = "D:/AI平台-B/resource-ops/docs/资源调研"
 FILES = {
     'E': os.path.join(ROOT, '任务E_调研结果_2026-08-25.md'),
     'F': os.path.join(ROOT, '任务F_调研结果_2026-08-25.md'),

@@ -22,7 +22,7 @@ python sync_all.py --feishu
 python sync_all.py --dry-run
 
 # 只处理指定仓库/导出
-python sync_all.py --repo ai-resource-hub --repo feishu-data-hub
+python sync_all.py --repo ai-platform --repo feishu-data-hub
 ```
 
 ## 行为说明

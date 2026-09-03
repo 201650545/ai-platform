@@ -4,11 +4,11 @@
 
   "repos": [
     {
-      "name": "ai-resource-hub",
-      "path": "D:\\ai-resource-hub",
+      "name": "ai-platform",
+      "path": "D:\\AI平台-B",
       "branch": "main",
       "enabled": true,
-      "note": "AI 自助资源运营体系主仓库（方案书/调研/分派指令包/同步脚本）"
+      "note": "AI 单仓平台集成后主仓（resource-ops= 原 ai-resource-hub：方案书/调研/分派指令包/同步脚本）"
     },
     {
       "name": "feishu-data-hub",
@@ -35,8 +35,8 @@
 
   "feishu_exports": [
     {
-      "name": "ai-resource-hub 公开数据桥",
-      "cwd": "D:\\ai-resource-hub",
+      "name": "ai-platform resource-ops 公开数据桥",
+      "cwd": "D:\\AI平台-B\\resource-ops",
       "cmd": ["python", "exporter/export.py"],
       "env": ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_BASE_TOKEN"],
       "enabled": true,

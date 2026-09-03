@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import Ledger
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public")
-REMOTE_BASE = "https://201650545.github.io/ai-resource-hub"
+REMOTE_BASE = "https://201650545.github.io/ai-platform/resource-ops"
 FILES = ["index.json", "capabilities.json", "instances.json", "schema.json"]
 MANIFEST = "manifest.json"
 
