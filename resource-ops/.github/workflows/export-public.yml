@@ -1,0 +1,98 @@
+name: 公开数据桥导出
+
+# AI 自助资源运营体系 · 公开数据桥（方案书 §6.7）
+# 飞书 Bitable → 白名单 DTO → 额度模糊化 → 敏感扫描 → 语义校验
+# → build_id 变更判定 → GitHub Pages（Secret job 与 Pages job 隔离）
+# 敏感扫描/语义校验失败即中止部署（git 历史不可逆）。
+
+on:
+  schedule:
+    # 每日 03:23（避开 :00 高峰；数据为 daily 层级）
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '强制重新拉取（跳过 build_id 变更检测）'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-data-bridge
+  cancel-in-progress: false
+
+jobs:
+  export:
+    # Secret job：只读仓库，运行导出/校验。飞书 Secret 在这里，无发布权限。
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.changed.outputs.changed }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 设置 Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: 运行公开数据桥导出器
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+        run: python exporter/export.py
+
+      - name: 语义校验（含数量突变检测）
+        # --baseline 拉线上 index.json：与上一成功版本比较记录数下降 >30% 阻断
+        run: python exporter/validate.py --baseline https://201650545.github.io/ai-resource-hub/index.json
+
+      - name: 比较 build_id（数据未变化则跳过部署）
+        id: changed
+        run: |
+          RESULT=$(python exporter/check_changed.py ${{ github.event.inputs.force == 'true' && '--force' || '' }})
+          echo "$RESULT"
+          CHANGED=$(echo "$RESULT" | sed -n 's/^changed=//p')
+          CHANGED=${CHANGED:-false}
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: 上传 Pages 产物（仅 build_id 变化时）
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+  deploy:
+    # Pages job：只具备发布权限，拿不到飞书 Secret。
+    needs: export
+    if: needs.export.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  notify:
+    needs: [export, deploy]
+    if: ${{ always() && (needs.export.result == 'failure' || needs.deploy.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 失败通知（只发 run_id / failed_stage / error_code）
+        env:
+          BRIDGE_ALERT_WEBHOOK: ${{ secrets.BRIDGE_ALERT_WEBHOOK }}
+          FAILED_STAGE: ${{ needs.export.result == 'failure' && 'export' || 'deploy' }}
+        run: python .github/scripts/notify_failure.py
