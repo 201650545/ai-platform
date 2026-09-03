@@ -46,3 +46,9 @@ config/github.json
 
 # modelscope-daily 运行日志（不入库，P2-2）
 modelscope-daily/logs/
+
+# Obsidian 运行时（保留 .obsidian/app.json 与 appearance.json 最小配置入库）
+.obsidian/workspace*.json
+.obsidian/cache
+.obsidian/plugins/*/data.json
+.obsidian/plugins/*/main.js

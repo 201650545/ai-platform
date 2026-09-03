@@ -3,6 +3,8 @@ name: AI 平台（ai-platform）
 github: https://github.com/201650545/ai-platform
 visibility: public
 type: ai-infrastructure
+home: Home.md
+task_board: docs/01-任务看板.md
 
 描述: >
   AI 基建主仓：多网关 API 聚合、AI 搜索、GitHub 管理、飞书集成、
