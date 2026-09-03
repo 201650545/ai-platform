@@ -1,0 +1,272 @@
+# Semantic configuration for the learning-english project.
+# Maps tables and fields to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: learning-english
+  domains:
+    - learning
+    - language
+  entity_types:
+    - task
+    - learning_event
+    - knowledge
+    - metric
+    - content
+  capabilities:
+    - study_planning
+    - review_prioritization
+    - error_analysis
+    - progress_analysis
+    - content_recommendation
+  supported_queries:
+    - "制定英语学习计划"
+    - "分析需要复习的内容"
+    - "分析学习错误"
+    - "查看能力状态"
+    - "推荐学习文本"
+
+tables:
+  text-library:
+    role: content
+    entity_type: content
+    preferred_for:
+      - content_recommendation
+    primary_display_field: "文本标题"
+    date_field: "上次使用日期"
+    status_field: "使用状态"
+
+  vocabulary:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - progress_analysis
+    primary_display_field: "单词"
+    date_field: "下次复习"
+    status_field: "掌握状态"
+
+  learning-log:
+    role: event_log
+    entity_type: learning_event
+    preferred_for:
+      - recent_activity
+      - performance_analysis
+    primary_display_field: "日期"
+    date_field: "日期"
+    status_field: "结果"
+
+  daily-plan:
+    role: plan
+    entity_type: task_collection
+    preferred_for:
+      - daily_planning
+    primary_display_field: "日期"
+    date_field: "日期"
+    status_field: "完成状态"
+
+  lexical-units:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - content_recommendation
+    primary_display_field: "展示名称"
+    date_field: null
+    status_field: "队列状态"
+
+  study-sessions:
+    role: event_log
+    entity_type: learning_event
+    preferred_for:
+      - recent_activity
+      - progress_analysis
+    primary_display_field: "日期"
+    date_field: "日期"
+    status_field: "完成状态"
+
+  study-tasks:
+    role: plan
+    entity_type: task
+    preferred_for:
+      - daily_planning
+      - progress_analysis
+    primary_display_field: "任务名称"
+    date_field: "计划日期"
+    status_field: "状态"
+
+  competency-state:
+    role: metric
+    entity_type: metric
+    preferred_for:
+      - progress_analysis
+      - review_prioritization
+    primary_display_field: "能力维度"
+    date_field: "下次复习时间"
+    status_field: "当前等级"
+
+  error-remediation:
+    role: error_log
+    entity_type: learning_event
+    preferred_for:
+      - error_analysis
+    primary_display_field: "错误类型"
+    date_field: "最近出现日期"
+    status_field: "是否已解决"
+
+fields:
+  vocabulary:
+    "单词":
+      semantic_type: entity_identity_title
+    "词性":
+      semantic_type: knowledge_topic
+    "最简中文":
+      semantic_type: content_text
+    "掌握状态":
+      semantic_type: mastery_level
+    "记忆阶段":
+      semantic_type: status
+    "正确次数":
+      semantic_type: attempt_count
+    "学习次数":
+      semantic_type: attempt_count
+    "上次测验":
+      semantic_type: event_date
+    "下次复习":
+      semantic_type: review_due_at
+    "难度等级":
+      semantic_type: difficulty
+    "关联文本":
+      semantic_type: relation
+    "学习日志":
+      semantic_type: relation
+
+  learning-log:
+    "日期":
+      semantic_type: event_date
+    "结果":
+      semantic_type: outcome
+    "正确答案":
+      semantic_type: content_text
+    "你的回答":
+      semantic_type: content_text
+    "关联单词":
+      semantic_type: relation
+
+  daily-plan:
+    "日期":
+      semantic_type: planned_date
+    "完成状态":
+      semantic_type: task_status
+    "正确率":
+      semantic_type: accuracy
+    "复习词数":
+      semantic_type: score
+    "新词数":
+      semantic_type: score
+    "单词列表(link)":
+      semantic_type: relation
+
+  study-tasks:
+    "任务名称":
+      semantic_type: task_title
+    "任务类型":
+      semantic_type: knowledge_topic
+    "计划日期":
+      semantic_type: planned_date
+    "截止时间":
+      semantic_type: due_date
+    "状态":
+      semantic_type: task_status
+    "完成度":
+      semantic_type: score
+    "预计时长分钟":
+      semantic_type: duration_minutes
+    "实际时长分钟":
+      semantic_type: duration_minutes
+    "是否延迟任务":
+      semantic_type: status
+    "是否迁移任务":
+      semantic_type: status
+
+  competency-state:
+    "能力维度":
+      semantic_type: knowledge_topic
+    "当前等级":
+      semantic_type: mastery_level
+    "最近测试时间":
+      semantic_type: event_date
+    "最近通过时间":
+      semantic_type: event_date
+    "下次复习时间":
+      semantic_type: review_due_at
+    "间隔天数":
+      semantic_type: duration_minutes
+    "稳定度":
+      semantic_type: confidence
+    "难度":
+      semantic_type: difficulty
+    "连续成功次数":
+      semantic_type: attempt_count
+    "连续失败次数":
+      semantic_type: attempt_count
+
+  error-remediation:
+    "错误类型":
+      semantic_type: error_type
+    "原始错误":
+      semantic_type: content_text
+    "正确形式":
+      semantic_type: content_text
+    "首次出现日期":
+      semantic_type: event_date
+    "最近出现日期":
+      semantic_type: event_date
+    "重复次数":
+      semantic_type: attempt_count
+    "是否已解决":
+      semantic_type: status
+
+  text-library:
+    "文本标题":
+      semantic_type: entity_identity_title
+    "难度等级":
+      semantic_type: difficulty
+    "使用状态":
+      semantic_type: status
+    "使用次数":
+      semantic_type: attempt_count
+    "上次使用日期":
+      semantic_type: event_date
+    "最早复用日期":
+      semantic_type: review_due_at
+    "关联词汇":
+      semantic_type: relation
+
+  study-sessions:
+    "日期":
+      semantic_type: event_date
+    "开始时间":
+      semantic_type: event_date
+    "结束时间":
+      semantic_type: event_date
+    "完成状态":
+      semantic_type: task_status
+    "输入分钟":
+      semantic_type: duration_minutes
+    "输出分钟":
+      semantic_type: duration_minutes
+    "主观难度":
+      semantic_type: difficulty
+    "专注度":
+      semantic_type: confidence
+
+  lexical-units:
+    "展示名称":
+      semantic_type: entity_identity_title
+    "队列状态":
+      semantic_type: status
+    "重要性":
+      semantic_type: task_priority
