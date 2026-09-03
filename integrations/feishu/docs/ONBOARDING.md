@@ -1,5 +1,12 @@
 # 新项目接入指南
 
+> **迁移说明（2026-09-03）**
+> 本模块已由独立仓 `feishu-data-hub` 迁入 AI 平台主仓 `ai-platform`，位于 `integrations/feishu/`。
+> 下文中的站点 URL 已按新仓 Pages 根 `https://201650545.github.io/ai-platform/` 更新；若集成时 Pages 源配置为子路径或
+> 自定义域名，请同步替换。旧站点 `https://201650545.github.io/feishu-data-hub/` 已失效。
+> 详见 [MIGRATION-NOTE.md](../MIGRATION-NOTE.md)。
+
+
 本文档提供将一个新的飞书 Base 接入 Feishu Data Hub 的完整步骤，以及 AI 代理（Agent）协作时的修改权限边界。
 
 ---
@@ -406,7 +413,7 @@ npm run validate:all
 访问以下 URL 查看 routing.json：
 
 ```
-https://201650545.github.io/feishu-data-hub/routing.json
+https://201650545.github.io/ai-platform/routing.json
 ```
 
 确认：
@@ -430,7 +437,7 @@ cat public/routing.json | node -e "const r=JSON.parse(require('fs').readFileSync
 2. 访问以下 URL 确认新项目已出现：
 
 ```
-https://201650545.github.io/feishu-data-hub/catalog.json
+https://201650545.github.io/ai-platform/catalog.json
 ```
 
 确认 `projects` 数组中包含新项目条目，且 `sync_status: "ok"`、`is_stale: false`。
@@ -438,9 +445,9 @@ https://201650545.github.io/feishu-data-hub/catalog.json
 3. 访问项目级入口确认数据正确：
 
 ```
-https://201650545.github.io/feishu-data-hub/projects/<slug>/manifest.json
-https://201650545.github.io/feishu-data-hub/projects/<slug>/index.html
-https://201650545.github.io/feishu-data-hub/projects/<slug>/status.json
+https://201650545.github.io/ai-platform/projects/<slug>/manifest.json
+https://201650545.github.io/ai-platform/projects/<slug>/index.html
+https://201650545.github.io/ai-platform/projects/<slug>/status.json
 ```
 
 4. 检查各表的 `record_count` 和 `field_count` 是否符合预期

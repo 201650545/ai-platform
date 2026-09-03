@@ -1,22 +1,31 @@
 # Validate — lightweight config + syntax validation for pull requests and pushes.
 # Runs WITHOUT access to production secrets or GitHub Pages; only validates files.
-name: "Validate"
+# ---------------------------------------------------------------------------
+# 迁移说明（2026-09-03）：本文件随 feishu-data-hub 一并迁入 ai-platform，
+# 现位于 integrations/feishu/.github/workflows/。GitHub 只识别仓库根目录的
+# .github/workflows/，因此当前位置不会触发任何运行；集成阶段需迁移至根目录，
+# 并使用下列 name（已加 "Feishu: " 前缀，避免与主仓其他业务线工作流重名）。
+# working-directory / 路径过滤 / cache-dependency-path / artifact 路径均已
+# 按新仓结构调整完毕，迁移到根目录后可直接运行。
+# 详见 integrations/feishu/MIGRATION-NOTE.md
+# ---------------------------------------------------------------------------
+name: "Feishu: Validate"
 
 on:
   pull_request:
     paths:
-      - "config/**"
-      - "scripts/**"
-      - "lib/**"
-      - ".github/workflows/validate.yml"
+      - "integrations/feishu/config/**"
+      - "integrations/feishu/scripts/**"
+      - "integrations/feishu/lib/**"
+      - "integrations/feishu/.github/workflows/validate.yml"
   push:
     branches:
       - main
     paths:
-      - "config/**"
-      - "scripts/**"
-      - "lib/**"
-      - ".github/workflows/validate.yml"
+      - "integrations/feishu/config/**"
+      - "integrations/feishu/scripts/**"
+      - "integrations/feishu/lib/**"
+      - "integrations/feishu/.github/workflows/validate.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,6 +39,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: integrations/feishu
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -39,6 +51,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: integrations/feishu/package-lock.json
 
       - name: Install dependencies
         run: npm ci

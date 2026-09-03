@@ -1,5 +1,12 @@
 # 架构概览
 
+> **迁移说明（2026-09-03）**
+> 本模块已由独立仓 `feishu-data-hub` 迁入 AI 平台主仓 `ai-platform`，位于 `integrations/feishu/`。
+> 下文中的站点 URL 已按新仓 Pages 根 `https://201650545.github.io/ai-platform/` 更新；若集成时 Pages 源配置为子路径或
+> 自定义域名，请同步替换。旧站点 `https://201650545.github.io/feishu-data-hub/` 已失效。
+> 详见 [MIGRATION-NOTE.md](../MIGRATION-NOTE.md)。
+
+
 本文档描述 Feishu Data Hub 的整体架构、目录结构、数据流、配置体系、共享库模块、故障隔离、遗留兼容和缓存策略。
 
 ---
@@ -25,7 +32,7 @@ Feishu Data Hub 采用 **"单仓库多项目"** 架构，核心理念是：
 ## 2. 目录结构
 
 ```
-feishu-data-hub/
+integrations/feishu/
 ├── config/
 │   ├── hub.yaml                      # Hub 级全局配置
 │   ├── credential-profiles.yaml      # 凭据配置（引用 GitHub Secret 名称）
@@ -138,11 +145,11 @@ catalog.json + index.html
 GitHub Pages
     │
     │  ⑤ GitHub Actions 部署
-    │     - upload-pages-artifact (path: public)
+    │     - upload-pages-artifact (path: integrations/feishu/public)
     │     - deploy-pages
     │
     ▼
-https://201650545.github.io/feishu-data-hub/
+https://201650545.github.io/ai-platform/
 ```
 
 ### 3.1 同步编排流程（sync-hub.mjs）

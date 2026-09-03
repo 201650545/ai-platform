@@ -1,8 +1,15 @@
 # Feishu Data Hub
 
+> **迁移状态（2026-09-03）**
+> 本模块已由独立仓 `feishu-data-hub` 迁入 AI 平台主仓 `ai-platform`，现位于 **`integrations/feishu/`**。
+> - 新仓：<https://github.com/201650545/ai-platform>
+> - 迁移说明见 **[MIGRATION-NOTE.md](MIGRATION-NOTE.md)**
+> - 旧 Pages 站点 `https://201650545.github.io/feishu-data-hub/` 将在集成后失效，新站点地址待 Pages 源重新配置后确定（详见迁移说明）。
+> - 下文所有命令默认在 **`integrations/feishu/`** 目录下执行。
+
 统一公开导出的飞书多维表格数据中心。将飞书 Bitable 数据导出为静态 JSON，部署到 GitHub Pages，供 AI 工具和其他消费者读取数据模型、记录和表间关联，无需飞书访问权限。
 
-**站点地址**：https://201650545.github.io/feishu-data-hub/
+**站点地址**：迁移后待定（原 `https://201650545.github.io/feishu-data-hub/` 已失效）
 
 ---
 
@@ -55,7 +62,10 @@
 
 ## 本地执行
 
+> 在 `integrations/feishu/` 目录下执行（迁入主仓后路径已变更）：
+
 ```bash
+cd integrations/feishu
 # 安装依赖
 npm ci
 
@@ -125,14 +135,21 @@ export FEISHU_BASE_REGISTRY_JSON='{"learning-english": {"app_token": "xxxx"}}'
 
 ## GitHub Actions
 
-| 工作流 | 触发 | 说明 |
-|---|---|---|
-| `sync-hourly.yml` | cron `17 * * * *` | 每小时同步 hourly 层级项目 |
-| `sync-daily.yml` | cron `17 3 * * *` | 每日同步 daily 层级项目 |
-| `sync-manual.yml` | 手动 | 同步全部或指定项目，支持 force 和 dry-run |
-| `validate.yml` | PR / push | 轻量验证（无密钥访问） |
+| 工作流文件 | 工作流 `name:`（迁入后） | 触发 | 说明 |
+|---|---|---|---|
+| `sync-hourly.yml` | `Feishu: Hourly Sync` | cron `17 * * * *` | 每小时同步 hourly 层级项目 |
+| `sync-daily.yml` | `Feishu: Daily Sync` | cron `17 3 * * *` | 每日同步 daily 层级项目 |
+| `sync-manual.yml` | `Feishu: Manual Sync` | 手动 | 同步全部或指定项目，支持 force 和 dry-run |
+| `validate.yml` | `Feishu: Validate` | PR / push | 轻量验证（无密钥访问） |
 
-所有 Actions 固定到完整 commit SHA，Dependabot 每周检查更新。
+> **重要 —— 工作流当前不生效**
+> 四个工作流文件现位于本模块的 `integrations/feishu/.github/workflows/` 下。
+> GitHub **只识别仓库根目录** `.github/workflows/`，因此当前位置不会触发任何运行。
+> 集成阶段需由负责根目录的维护者将这 4 个文件迁移到根目录 `.github/workflows/`，
+> 并按上表的 `name:` 重命名，避免与主仓其他业务线的工作流重名。
+> 文件内已预置 `working-directory`、路径过滤与 `cache-dependency-path`，迁移到根目录后可直接运行。
+
+所有 Actions 固定到完整 commit SHA，Dependabot 每周检查更新（配置文件：`integrations/feishu/.github/dependabot.yml`，集成时需合并进根目录的 dependabot 配置）。
 
 流水线：checkout → Node 22 → npm ci → 语法检查 → 配置验证 → 同步 → 输出验证 → 安全扫描 → 部署
 
@@ -146,5 +163,6 @@ export FEISHU_BASE_REGISTRY_JSON='{"learning-english": {"app_token": "xxxx"}}'
 | [docs/ONBOARDING.md](docs/ONBOARDING.md) | 新项目接入指南 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 运维手册 |
 | [docs/SECURITY.md](docs/SECURITY.md) | 安全策略 |
-| [docs/MIGRATION_BASELINE.md](docs/MIGRATION_BASELINE.md) | 迁移前基线快照 |
-| [docs/MIGRATION_REPORT.md](docs/MIGRATION_REPORT.md) | 迁移报告 |
+| [docs/MIGRATION_BASELINE.md](docs/MIGRATION_BASELINE.md) | 迁移前基线快照（历史存档） |
+| [docs/MIGRATION_REPORT.md](docs/MIGRATION_REPORT.md) | 迁移报告（历史存档） |
+| [MIGRATION-NOTE.md](MIGRATION-NOTE.md) | **2026-09-03 迁入 ai-platform 的迁移说明** |

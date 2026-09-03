@@ -45,7 +45,14 @@ async function loadVocabulary() {
     ?? readLocalRecords(resolve("site/data/projects/learning-english/tables/vocabulary"));
   if (local) return local;
 
-  const base = "https://201650545.github.io/feishu-data-hub/projects/learning-english/";
+  // 2026-09-03 迁移：feishu-data-hub 已并入 ai-platform，本模块位于 integrations/feishu/。
+  // 旧 Pages 域名（https://201650545.github.io/feishu-data-hub/）将在集成后失效。
+  // 默认指向新仓 Pages 根；若 Pages 源配置为子路径或自定义域名，用环境变量覆盖：
+  //   FEISHU_PAGES_BASE_URL="https://<your-pages-root>/"
+  const PAGES_BASE = (
+    process.env.FEISHU_PAGES_BASE_URL ?? "https://201650545.github.io/ai-platform/"
+  ).replace(/\/+$/, "");
+  const base = `${PAGES_BASE}/projects/learning-english/`;
   const manifest = await (await fetch(base + "manifest.json")).json();
   const vocab = manifest.tables.find((t) => t.slug === "vocabulary");
   const recs = [];

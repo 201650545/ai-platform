@@ -1,5 +1,11 @@
 # 迁移基线快照
 
+> **历史存档（2026-09-03）**
+> 本文档记录的是 **迁入 ai-platform 之前** 的状态，文中的仓库名与 URL 均指向已退役的旧仓
+> （`201650545/feishu-data-hub`）与旧站点（`https://201650545.github.io/feishu-data-hub/`）。
+> **原样保留、不做改写**，仅供追溯。当前状态见 [MIGRATION-NOTE.md](../MIGRATION-NOTE.md)。
+
+
 本文档记录 Feishu Data Hub 迁移前的系统状态，作为迁移的参照基线和回滚目标。迁移前已打 Git 标签 `pre-data-hub-migration`。
 
 ---

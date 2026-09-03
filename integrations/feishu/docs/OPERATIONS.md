@@ -1,5 +1,12 @@
 # 运维手册
 
+> **迁移说明（2026-09-03）**
+> 本模块已由独立仓 `feishu-data-hub` 迁入 AI 平台主仓 `ai-platform`，位于 `integrations/feishu/`。
+> 下文中的站点 URL 已按新仓 Pages 根 `https://201650545.github.io/ai-platform/` 更新；若集成时 Pages 源配置为子路径或
+> 自定义域名，请同步替换。旧站点 `https://201650545.github.io/feishu-data-hub/` 已失效。
+> 详见 [MIGRATION-NOTE.md](../MIGRATION-NOTE.md)。
+
+
 本文档涵盖 Feishu Data Hub 的日常运维操作，包括 GitHub Secrets 配置、监控方法、常用操作、故障排查和回滚流程。
 
 ---
@@ -65,7 +72,7 @@
 **站点 URL**：
 
 ```
-https://201650545.github.io/feishu-data-hub/
+https://201650545.github.io/ai-platform/
 ```
 
 **部署来源**：`public/` 目录（通过 `actions/upload-pages-artifact` 上传）
@@ -86,7 +93,7 @@ https://201650545.github.io/feishu-data-hub/
 访问全局目录，确认所有项目状态：
 
 ```
-https://201650545.github.io/feishu-data-hub/catalog.json
+https://201650545.github.io/ai-platform/catalog.json
 ```
 
 关键字段：
@@ -101,7 +108,7 @@ https://201650545.github.io/feishu-data-hub/catalog.json
 访问特定项目的同步状态：
 
 ```
-https://201650545.github.io/feishu-data-hub/projects/<slug>/status.json
+https://201650545.github.io/ai-platform/projects/<slug>/status.json
 ```
 
 关键字段：
@@ -290,12 +297,12 @@ npm run project:add -- --slug <slug> --title "标题" --base-key <key>
 **解决**：
 1. 使用带 `?v=<build_id>` 查询参数的 URL 访问最新数据：
    ```
-   https://201650545.github.io/feishu-data-hub/catalog.json?v=<build_id>
+   https://201650545.github.io/ai-platform/catalog.json?v=<build_id>
    ```
 2. 查看 `catalog.json` 中的 `build_id` 字段获取当前版本标识
 3. 使用版本化 catalog 路径访问特定版本：
    ```
-   https://201650545.github.io/feishu-data-hub/catalog-versioned/<build_id>.json
+   https://201650545.github.io/ai-platform/catalog-versioned/<build_id>.json
    ```
 4. CDN 缓存通常在数分钟到数小时内自动刷新
 5. 若急需刷新，可强制重新部署（触发 Manual Sync）

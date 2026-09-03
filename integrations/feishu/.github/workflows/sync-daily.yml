@@ -1,6 +1,15 @@
 # Daily Sync — syncs all daily-tier Feishu Bitable projects and deploys to GitHub Pages.
 # Triggers: daily at 03:17 UTC and manual workflow_dispatch.
-name: "Daily Sync"
+# ---------------------------------------------------------------------------
+# 迁移说明（2026-09-03）：本文件随 feishu-data-hub 一并迁入 ai-platform，
+# 现位于 integrations/feishu/.github/workflows/。GitHub 只识别仓库根目录的
+# .github/workflows/，因此当前位置不会触发任何运行；集成阶段需迁移至根目录，
+# 并使用下列 name（已加 "Feishu: " 前缀，避免与主仓其他业务线工作流重名）。
+# working-directory / 路径过滤 / cache-dependency-path / artifact 路径均已
+# 按新仓结构调整完毕，迁移到根目录后可直接运行。
+# 详见 integrations/feishu/MIGRATION-NOTE.md
+# ---------------------------------------------------------------------------
+name: "Feishu: Daily Sync"
 
 on:
   schedule:
@@ -36,6 +45,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: integrations/feishu
     outputs:
       content_skip: ${{ steps.content_change.outputs.skip }}
     steps:
@@ -47,6 +59,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+          cache-dependency-path: integrations/feishu/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -116,7 +129,7 @@ jobs:
         if: github.event.inputs.dry_run != 'true' && steps.content_change.outputs.skip != 'true'
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
         with:
-          path: public
+          path: integrations/feishu/public
 
   deploy:
     needs: build

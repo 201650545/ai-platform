@@ -5,10 +5,18 @@
 分析：旧词回炉率 / 近似轮次正确率 / 间隔效应 / 方向×维度正确率
 输出：打印指标（供整理成 docs 报告）
 """
+import os
 import urllib.request, json, datetime
 import pandas as pd
 
-BASE = "https://201650545.github.io/feishu-data-hub/projects/learning-english/tables/learning-log/records-0001.json"
+# 2026-09-03 迁移：feishu-data-hub 已并入 ai-platform，本模块位于 integrations/feishu/。
+# 旧 Pages 域名（https://201650545.github.io/feishu-data-hub/）将在集成后失效。
+# 默认指向新仓 Pages 根；若 Pages 源配置为子路径或自定义域名，用环境变量覆盖：
+#   export FEISHU_PAGES_BASE_URL="https://<your-pages-root>/"
+PAGES_BASE = os.environ.get(
+    "FEISHU_PAGES_BASE_URL", "https://201650545.github.io/ai-platform/"
+).rstrip("/")
+BASE = f"{PAGES_BASE}/projects/learning-english/tables/learning-log/records-0001.json"
 
 def fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": "curl/8"})

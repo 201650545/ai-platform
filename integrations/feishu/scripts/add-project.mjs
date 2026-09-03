@@ -133,8 +133,11 @@ async function main() {
 
 8. 验证部署
    - 等待 GitHub Actions 运行完成
-   - 访问: https://201650545.github.io/feishu-data-hub/catalog.json
+   - 访问: ${(
+     process.env.FEISHU_PAGES_BASE_URL ?? "https://201650545.github.io/ai-platform/"
+   ).replace(/\/+$/, "")}/catalog.json
    - 确认新项目出现在 catalog 中
+   - 注：Pages 根地址随集成配置而定，可用 FEISHU_PAGES_BASE_URL 覆盖
 `);
 }
 
