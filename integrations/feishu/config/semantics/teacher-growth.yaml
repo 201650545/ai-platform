@@ -1,0 +1,178 @@
+# Semantic configuration for the teacher-growth project.
+# Maps tables and fields to controlled semantic types for AI understanding.
+# This file is human-maintained — do not auto-generate.
+
+semantic_version: 1
+
+project:
+  slug: teacher-growth
+  domains:
+    - learning
+    - knowledge
+  entity_types:
+    - knowledge
+    - content
+    - metric
+    - learning_event
+    - reference
+  capabilities:
+    - study_planning
+    - review_prioritization
+    - progress_analysis
+    - error_analysis
+    - content_recommendation
+  supported_queries:
+    - "制定教师成长学习计划"
+    - "查看知识点掌握情况"
+    - "分析学习日志"
+    - "推荐自测题目"
+    - "查看知识分类体系"
+
+tables:
+  knowledge-points:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - review_prioritization
+      - progress_analysis
+      - error_analysis
+    primary_display_field: "条目名称"
+    date_field: "下次复习日期"
+    status_field: "掌握状态"
+
+  knowledge-categories:
+    role: knowledge
+    entity_type: knowledge
+    preferred_for:
+      - progress_analysis
+      - content_recommendation
+    primary_display_field: "学科分类"
+    date_field: null
+    status_field: "掌握状态"
+
+  study-logs:
+    role: event_log
+    entity_type: learning_event
+    preferred_for:
+      - progress_analysis
+      - error_analysis
+    primary_display_field: "知识点"
+    date_field: "学习日期"
+    status_field: "自测结果"
+
+  self-test-questions:
+    role: content
+    entity_type: content
+    preferred_for:
+      - content_recommendation
+      - error_analysis
+    primary_display_field: "题目"
+    date_field: null
+    status_field: "难度"
+
+fields:
+  knowledge-points:
+    "条目名称":
+      semantic_type: entity_identity_title
+    "知识要点":
+      semantic_type: content_text
+    "一级分类":
+      semantic_type: knowledge_topic
+    "二级分类":
+      semantic_type: knowledge_topic
+    "三级分类":
+      semantic_type: knowledge_topic
+    "重要程度":
+      semantic_type: task_priority
+    "学习策略":
+      semantic_type: knowledge_topic
+    "掌握状态":
+      semantic_type: status
+    "掌握度评分":
+      semantic_type: mastery_level
+    "复习次数":
+      semantic_type: attempt_count
+    "上次学习日期":
+      semantic_type: event_date
+    "下次复习日期":
+      semantic_type: review_due_at
+    "适用学段":
+      semantic_type: knowledge_topic
+    "学习资源":
+      semantic_type: source_reference
+    "费曼解释记录":
+      semantic_type: content_text
+    "所属分类":
+      semantic_type: relation
+    "备注":
+      semantic_type: content_text
+
+  knowledge-categories:
+    "掌握状态":
+      semantic_type: status
+    "适用学段":
+      semantic_type: knowledge_topic
+    "学科分类":
+      semantic_type: knowledge_topic
+    "备注":
+      semantic_type: content_text
+    "关联知识点":
+      semantic_type: relation
+    "二级分类":
+      semantic_type: knowledge_topic
+    "学习策略":
+      semantic_type: knowledge_topic
+    "知识要点":
+      semantic_type: content_text
+    "条目数量":
+      semantic_type: score
+    "一级分类":
+      semantic_type: knowledge_topic
+    "重要程度":
+      semantic_type: task_priority
+    "三级分类":
+      semantic_type: knowledge_topic
+    "学习资源":
+      semantic_type: source_reference
+
+  study-logs:
+    "费曼解释我的话":
+      semantic_type: content_text
+    "自测结果":
+      semantic_type: outcome
+    "卡壳点":
+      semantic_type: error_type
+    "学习日期":
+      semantic_type: event_date
+    "知识点":
+      semantic_type: knowledge_topic
+    "学习时长分钟":
+      semantic_type: duration_minutes
+    "掌握度评分":
+      semantic_type: mastery_level
+    "学习方式":
+      semantic_type: knowledge_topic
+    "学习心得":
+      semantic_type: content_text
+    "学习类型":
+      semantic_type: status
+    "下一步行动":
+      semantic_type: status
+
+  self-test-questions:
+    "评分标准":
+      semantic_type: content_text
+    "参考答案":
+      semantic_type: content_text
+    "来源":
+      semantic_type: source_reference
+    "一级分类":
+      semantic_type: knowledge_topic
+    "题型":
+      semantic_type: knowledge_topic
+    "关联知识点":
+      semantic_type: relation
+    "题目":
+      semantic_type: content_text
+    "难度":
+      semantic_type: difficulty
