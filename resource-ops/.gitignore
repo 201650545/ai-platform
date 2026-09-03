@@ -1,0 +1,25 @@
+# 凭证/密钥——绝不上库（方案书 §6 安全边界）
+**/credentials.json
+**/.env
+**/*.key
+**/*.pem
+
+# 本地配置目录
+config/
+
+# 运行时产物
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+__pycache__/
+*.pyc
+
+# 公开数据桥产物（CI 生成并部署到 GitHub Pages，不入库）
+public/
+
+# 控制平面运行时产物（设计 §5：runtime 全部 gitignored）
+runtime/
+
+# 系统
+.DS_Store
+Thumbs.db

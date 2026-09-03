@@ -1,0 +1,248 @@
+# Query routing configuration for the Data Hub.
+# Defines how AI should select projects and data sources for different query types.
+# This file provides "candidate project selection" only — not full NLU.
+
+routing_version: 1
+
+# Controlled status vocabulary for routing decisions
+status_vocab:
+  - ok
+  - stale
+  - failed
+  - unavailable
+  - security_blocked
+  - disabled
+
+# Intent definitions — each maps a query type to data sources and projects
+intents:
+  list_projects:
+    description: "列出所有可用项目"
+    required_sources:
+      - catalog
+    projects: []
+    record_data_required: false
+    recommended_first_files:
+      - catalog.json
+
+  project_health:
+    description: "检查项目同步状态和数据新鲜度"
+    required_sources:
+      - catalog
+      - status
+    projects: []
+    record_data_required: false
+    recommended_first_files:
+      - catalog.json
+      - "projects/<slug>/status.json"
+
+  study_planning:
+    description: "制定学习计划（跨项目）"
+    capabilities:
+      - study_planning
+    selection: all_active_matching
+    record_data_required: true
+    recommended_first_files:
+      - catalog.json
+      - "projects/<slug>/summary.md"
+      - "projects/<slug>/agent-guide.md"
+      - "projects/<slug>/semantic.json"
+    recommended_tables:
+      - daily-plan
+      - study-tasks
+      - daily-study-plan
+      - competency-state
+      - knowledge-points
+      - vocabulary
+      - exam-points
+      - knowledge-modules
+      - knowledge-points
+      - knowledge-categories
+      - study-logs
+      - self-test-questions
+
+  english_review:
+    description: "分析英语复习情况"
+    projects:
+      - learning-english
+    record_data_required: true
+    recommended_first_files:
+      - "projects/learning-english/summary.md"
+      - "projects/learning-english/agent-guide.md"
+      - "projects/learning-english/semantic.json"
+    recommended_tables:
+      - vocabulary
+      - learning-log
+      - competency-state
+      - error-remediation
+      - study-tasks
+
+  english_errors:
+    description: "分析英语学习错误"
+    projects:
+      - learning-english
+    record_data_required: true
+    recommended_first_files:
+      - "projects/learning-english/agent-guide.md"
+      - "projects/learning-english/semantic.json"
+    recommended_tables:
+      - error-remediation
+      - learning-log
+      - competency-state
+
+  civil_service_error_analysis:
+    description: "分析公考错题"
+    projects:
+      - civil-service-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/civil-service-exam/summary.md"
+      - "projects/civil-service-exam/agent-guide.md"
+      - "projects/civil-service-exam/semantic.json"
+    recommended_tables:
+      - practice-records
+      - past-exam-questions
+      - knowledge-points
+      - common-traps
+      - exam-analysis
+
+  civil_service_exam_patterns:
+    description: "分析真题命题规律"
+    projects:
+      - civil-service-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/civil-service-exam/semantic.json"
+      - "projects/civil-service-exam/schema.json"
+    recommended_tables:
+      - exam-patterns
+      - past-exam-questions
+      - exam-analysis
+      - common-traps
+
+  civil_service_knowledge_review:
+    description: "查看公考知识点掌握情况"
+    projects:
+      - civil-service-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/civil-service-exam/agent-guide.md"
+      - "projects/civil-service-exam/semantic.json"
+    recommended_tables:
+      - knowledge-points
+      - exam-patterns
+
+  teacher_cert_review:
+    description: "查看教资考点掌握情况"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/summary.md"
+      - "projects/teacher-cert-exam/agent-guide.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - exam-points
+      - knowledge-modules
+
+  teacher_cert_exam_analysis:
+    description: "分析教资真题题型分布"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/semantic.json"
+      - "projects/teacher-cert-exam/schema.json"
+    recommended_tables:
+      - past-exam-questions
+      - question-templates
+      - exam-points
+
+  teacher_cert_error_analysis:
+    description: "分析教资错题"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/agent-guide.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - error-notebook
+      - exam-points
+      - past-exam-questions
+
+  teacher_cert_question_templates:
+    description: "查看教资题型答题框架"
+    projects:
+      - teacher-cert-exam
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-cert-exam/summary.md"
+      - "projects/teacher-cert-exam/semantic.json"
+    recommended_tables:
+      - question-templates
+      - knowledge-modules
+      - past-exam-questions
+
+  teacher_growth_review:
+    description: "查看教师成长知识点掌握情况"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/summary.md"
+      - "projects/teacher-growth/agent-guide.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - knowledge-points
+      - knowledge-categories
+
+  teacher_growth_study_analysis:
+    description: "分析教师成长学习日志"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/agent-guide.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - study-logs
+      - knowledge-points
+
+  teacher_growth_self_test:
+    description: "推荐教师成长自测题目"
+    projects:
+      - teacher-growth
+    record_data_required: true
+    recommended_first_files:
+      - "projects/teacher-growth/summary.md"
+      - "projects/teacher-growth/semantic.json"
+    recommended_tables:
+      - self-test-questions
+      - knowledge-points
+      - knowledge-categories
+
+# Reading depth guidelines
+reading_depth:
+  discovery:
+    description: "仅发现项目"
+    files:
+      - catalog.json
+
+  understanding:
+    description: "理解项目"
+    files:
+      - "projects/<slug>/summary.md"
+      - "projects/<slug>/agent-guide.md"
+      - "projects/<slug>/semantic.json"
+
+  structure:
+    description: "理解数据结构"
+    files:
+      - "projects/<slug>/schema.json"
+      - "projects/<slug>/manifest.json"
+
+  business_query:
+    description: "回答业务问题"
+    files:
+      - "只读取所需表的 records 分片"
+    rule: "不得扫描所有项目全部记录作为默认策略"

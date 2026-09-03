@@ -1,0 +1,57 @@
+# 任务卡 009：GitHub 推送与仓库规范化
+
+## 执行模型：OpenCode
+
+## 目标
+将 `D:\项目` 推送到 GitHub 私有仓库 `ai-hub`，并完成仓库规范化配置，使其可被 ChatGPT 网页版直接读取理解。
+
+## 前置条件
+- 用户已在 GitHub 网页创建私有仓库 `ai-hub`（201650545/ai-hub）
+- 本机 git 已配置用户（201650545 / yongtaog767@gmail.com）
+
+## 实现步骤
+
+### 1. 远程关联与推送
+```bash
+cd D:\项目
+git remote add origin https://github.com/201650545/ai-hub.git
+git push -u origin main
+```
+- 若提示认证：引导用户配置 Personal Access Token 或 Git Credential Manager
+- 若远程已有 README 冲突：`git pull --rebase origin main` 后再推
+
+### 2. 仓库规范化
+- 新增 `.gitattributes`：`* text=auto eol=crlf`（Windows 项目统一行尾，消除 LF/CRLF 警告）
+- 检查 `.gitignore` 生效：`git ls-files | grep channels.json` 应为空
+- 二次敏感扫描：`git grep -E "sk-[a-zA-Z0-9_-]{15,}"` 应只有占位符
+
+### 3. README 增强（让 ChatGPT 快速读懂）
+在现有 README.md 基础上补充：
+- 项目状态徽章区（预留）
+- 「给 AI 协作者的导读」小节：指向 ARCHITECTURE.md、04_任务卡/、05_执行指令/
+- 当前进度表（哪些模块已完成、哪些待做）
+
+### 4. 首次推送后验证
+- `git ls-remote origin` 确认远程同步
+- 仓库主页文件树完整（无 channels.json/auth.json/feishu.json）
+
+## 验收标准
+- `git push` 成功，GitHub 上可见全部文件
+- 无敏感配置文件入库
+- README 含 AI 协作者导读
+
+## 完成记录
+- 2026-08-06 完成（OpenCode / DeepSeek-V4-Flash；push 由本会话 + 用户认证协作完成）
+- 远程：`git remote add origin https://github.com/201650545/ai-hub.git` 已配置
+- 仓库创建：GitHub 上原无 `ai-hub`（API 404），已用凭据通过 `POST /user/repos` 创建私有仓库 **201650545/ai-hub**
+- 推送：启用 GCM（credential.helper=manager，复用本机已存 token），`git push -u origin main` 成功，远程 HEAD=229d03e；`git ls-remote` 复合同步
+- 规范化：`.gitattributes`（* text=auto eol=crlf）、`.gitignore` 生效；敏感扫描 git grep 仅命中示例占位
+- 文件树复核：远程无 channels/auth/feishu/quota/history JSON；仅示例配置文件入库；共 83 个跟踪文件
+- README 增强：项目状态徽章、「给 AI 协作者的导读」、当前进度表、核心目录速览
+- 遗留：无（全部验收项达成）
+
+## 2026-08-09 增量推送（OpenCode）
+- 引擎修复（c56a9e0/7d0ad43/bdaf8f7）+ E2E 回归（8cb0cf8）+ 任务卡状态（075ad73/de02f96）+ 管理面板升级（a3e4ada）+ 勘探报告/规则卡（5caea9d）+ 画布观察窗/生图规则卡/样例（8b6bfc6）共 9 提交推送
+- `git push origin main` 成功：远程 HEAD=8b6bfc6 与本地同步；`git ls-remote` 复核一致
+- 敏感复核：追踪文件中无 channels/auth/feishu/quota/history JSON，仅示例占位 key
+- 未追踪调试探针（06_组件编排器 下 151 个 test_/probe_/check_/inspect_ 脚本）不入库，保留本地

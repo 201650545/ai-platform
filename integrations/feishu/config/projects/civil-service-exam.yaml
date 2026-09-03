@@ -1,0 +1,192 @@
+# Project: Civil Service Exam Preparation
+# Second project in the Data Hub — tests multi-project architecture.
+
+config_version: 1
+
+project:
+  slug: civil-service-exam
+  title: "公考备考系统"
+  description: "目标岗位、知识点、刷题记录、真题、经验方法、深度解析、易错陷阱、命题规律"
+  group: exam
+  tags:
+    - 公考
+    - 备考
+  enabled: true
+  status: active
+
+source:
+  provider: feishu-bitable
+  credential_profile: public-personal
+  base_key: civil-service-exam
+  export_view_name: "AI 公开导出"
+
+table_discovery:
+  mode: view-name
+  include_tables: []
+  exclude_tables: []
+  require_export_view: true
+
+export:
+  chunk_size: 500
+  include_schema: true
+  include_summary: true
+  include_record_id: true
+  stable_sort: true
+
+privacy:
+  require_public_flag: false
+  scan_free_text: true
+  scan_urls: true
+  fail_on_sensitive_content: true
+
+schedule:
+  tier: daily
+
+compatibility:
+  mirror_to_legacy_root: false
+
+tables:
+  - table_name: "目标岗位库"
+    table_slug: target-positions
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "岗位名称"
+      - "竞争比"
+      - "历年分数线"
+      - "备注"
+      - "招录人数"
+      - "工作地点"
+      - "基层经历"
+      - "学历要求"
+      - "考试类型"
+      - "专业要求"
+      - "招录机关"
+
+  - table_name: "知识点库"
+    table_slug: knowledge-points
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "正确次数"
+      - "下次复习"
+      - "所属科目"
+      - "关联真题"
+      - "重要程度"
+      - "记忆阶段"
+      - "上次复习"
+      - "子模块"
+      - "掌握状态"
+      - "笔记"
+      - "知识点"
+      - "学习次数"
+
+  - table_name: "每日学习计划"
+    table_slug: daily-study-plan
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "备注"
+      - "完成状态"
+      - "实际时长(分钟)"
+      - "计划时长(分钟)"
+      - "学习科目"
+      - "正确率"
+      - "日期"
+      - "学习内容"
+
+  - table_name: "刷题记录"
+    table_slug: practice-records
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "题源"
+      - "正确答案"
+      - "关联知识点"
+      - "你的答案"
+      - "题目内容"
+      - "日期"
+      - "结果"
+      - "题型"
+      - "用时(秒)"
+      - "备注"
+      - "错因分析"
+
+  - table_name: "真题题库"
+    table_slug: past-exam-questions
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "试卷类型"
+      - "备注"
+      - "年份"
+      - "所属科目"
+      - "题型"
+      - "题源"
+      - "错因分析"
+      - "ID"
+      - "结果"
+      - "你的答案"
+      - "正确答案"
+      - "关联知识点"
+      - "题目内容"
+      - "用时(秒)"
+
+  - table_name: "经验方法库"
+    table_slug: experience-methods
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "来源"
+      - "实用程度"
+      - "ID"
+      - "经验标题"
+      - "适用场景"
+      - "标签"
+      - "备注"
+      - "核心内容"
+      - "分类"
+
+  - table_name: "真题深度解析库"
+    table_slug: exam-analysis
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "常见错误分析"
+      - "思维层次"
+      - "题型"
+      - "出题意图"
+      - "变式训练方向"
+      - "关联真题"
+      - "题目摘要"
+      - "解题思维路径"
+      - "难度等级"
+      - "考查知识点"
+
+  - table_name: "易错陷阱库"
+    table_slug: common-traps
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "陷阱类型"
+      - "错误思路"
+      - "正确思路"
+      - "典型真题"
+      - "陷阱描述"
+      - "所属模块"
+      - "陷阱名称"
+      - "防范口诀"
+
+  - table_name: "命题规律与考点频次"
+    table_slug: exam-patterns
+    view_name: "AI 公开导出"
+    enabled: true
+    fields:
+      - "考点名称"
+      - "复习优先级"
+      - "所属模块"
+      - "常见出题方式"
+      - "近5年出现频次"
+      - "考查频率"
+      - "关联知识点"
+      - "命题趋势分析"

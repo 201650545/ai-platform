@@ -3,7 +3,7 @@
 AI 基建主仓：多网关 API 聚合、AI 搜索、GitHub 管理、飞书集成、Agent 记忆协议、AI 资源运营。
 由 4 个旧仓整合而成：`ai-hub`（平台主干）+ `ai-resource-hub`（资源运营）+ `feishu-data-hub`（飞书导出）+ `ai-hub-memory`（记忆协议文档；运行数据仓仍独立）。
 
-> 状态：迁移进行中（2026-09-03 启动）。旧仓进入只读前，事实源仍以旧仓为准；本 README 随迁移更新。
+> 状态：迁移已完成（2026-09-03）。旧三仓（ai-hub / ai-resource-hub / feishu-data-hub）转入 Archive 冷却期（30-60 天），期满经人工确认后删除。
 
 ## 目标结构
 
@@ -20,10 +20,10 @@ AI平台/                     ← 本仓（GitHub: ai-platform）
 
 | 来源仓 | 去向 | 状态 |
 |---|---|---|
-| ai-hub | （根） | ⏳ migration/core |
-| ai-resource-hub | resource-ops/ | ⏳ migration/resource-ops |
-| feishu-data-hub | integrations/feishu/ | ⏳ migration/feishu |
-| ai-hub-memory（协议部分） | agent/memory/ | ⏳ migration/core |
+| ai-hub | （根） | ✅ 已并入 |
+| ai-resource-hub | resource-ops/ | ✅ 已并入 |
+| feishu-data-hub | integrations/feishu/ | ✅ 已并入 |
+| ai-hub-memory（协议部分） | agent/memory/ | ✅ 快照已迁 |
 | ai-hub-memory（运行数据） | 原仓保留独立 | ✅ 不迁移 |
 
 ## 给 AI / Agent 的读取顺序

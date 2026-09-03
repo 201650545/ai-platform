@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "description": "三端同步配置：GitHub ↔ 本地 ↔ 飞书。由 sync_all.py 读取执行。",
+
+  "repos": [
+    {
+      "name": "ai-platform",
+      "path": "D:\\AI平台",
+      "branch": "main",
+      "enabled": true,
+      "note": "AI 单仓平台集成后主仓（resource-ops= 原 ai-resource-hub：方案书/调研/分派指令包/同步脚本）"
+    },
+    {
+      "name": "feishu-data-hub",
+      "path": "D:\\项目\\feishu-data-hub",
+      "branch": "main",
+      "enabled": true,
+      "note": "学习英语数据桥：飞书 Base → GitHub Pages 公开 JSON"
+    },
+    {
+      "name": "ai-hub-memory",
+      "path": "D:\\项目\\ai-hub-memory",
+      "branch": "main",
+      "enabled": true,
+      "note": "多 Agent 共享记忆仓库"
+    },
+    {
+      "name": "ai-hub-monorepo",
+      "path": "D:\\项目",
+      "branch": "refactor/monorepo-20260812",
+      "enabled": false,
+      "note": "逆天主题单仓（已挂起）。默认不自动提交，需要时手动开启。"
+    }
+  ],
+
+  "feishu_exports": [
+    {
+      "name": "ai-platform resource-ops 公开数据桥",
+      "cwd": "D:\\AI平台\\resource-ops",
+      "cmd": ["python", "exporter/export.py"],
+      "env": ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_BASE_TOKEN"],
+      "enabled": true,
+      "note": "飞书 → 本地 public/（CI 已托管 GitHub Pages 发布，本地跑为可选）"
+    },
+    {
+      "name": "feishu-data-hub 学习英语导出",
+      "cwd": "D:\\项目\\feishu-data-hub",
+      "cmd": ["node", "scripts/sync.mjs"],
+      "env": ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_BASE_TOKEN"],
+      "enabled": true,
+      "note": "飞书 → 本地 site/（CI 已托管 GitHub Pages 发布，本地跑为可选）"
+    }
+  ],
+
+  "secret_scan": {
+    "description": "提交前敏感扫描（命中即跳过该仓库提交并告警）。",
+    "patterns": [
+      "sk-[A-Za-z0-9]{16,}",
+      "AIza[0-9A-Za-z_-]{20,}",
+      "ghp_[A-Za-z0-9]{20,}",
+      "Bearer\\s+[A-Za-z0-9._-]{20,}",
+      "app_secret[\"']?\\s*[:=]\\s*[\"']?[A-Za-z0-9]{15,}",
+      "tenant_access_token[\"']?\\s*[:=]\\s*[\"']?[A-Za-z0-9]{15,}",
+      "cli_[A-Za-z0-9]{20,}",
+      "eyJ[A-Za-z0-9_-]{20,}\\.[A-Za-z0-9_-]{10,}"
+    ]
+  }
+}

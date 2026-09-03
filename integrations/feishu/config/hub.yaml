@@ -1,0 +1,42 @@
+# Global Data Hub Configuration
+# This file defines the hub-level settings shared across all projects.
+
+hub_version: 1
+
+hub:
+  title: Feishu Data Hub
+  description: "统一公开导出的飞书多维表格数据中心"
+
+output:
+  root_dir: public
+  projects_dir: projects
+  catalog_file: catalog.json
+  catalog_versioned_dir: catalog-versioned
+  homepage_file: index.html
+
+build:
+  # build_id is generated at sync time as <timestamp>-<short-sha>
+  # It is embedded in catalog.json, project manifests, and index.html
+  # to bust GitHub Pages CDN cache.
+  include_build_id: true
+
+security:
+  # Security failures stop the entire deployment (all projects).
+  # Normal failures (timeout, API error) only affect the failing project.
+  fail_on_sensitive_content: true
+  scan_free_text: true
+  scan_urls: true
+  forbidden_files:
+    - .env
+    - .env.local
+    - .env.production
+    - debug-response.json
+    - api-cache.json
+    - raw-response.json
+
+defaults:
+  chunk_size: 500
+  max_table_bytes: 26214400  # 25 MB
+  include_record_id: true
+  stable_sort: true
+  export_view_name: "AI 公开导出"
