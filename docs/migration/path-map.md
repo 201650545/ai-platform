@@ -26,11 +26,11 @@
 
 ## 收尾清单（集成时逐项勾）
 
-- [ ] merge migration/resource-ops、migration/feishu
-- [ ] 根 README / project.yaml 终稿（迁移状态改为完成）
+- [x] merge migration/resource-ops、migration/feishu
+- [x] 根 README / project.yaml 终稿（迁移状态改为完成）
 - [x] 全局扫描旧仓名引用：功能性 URL（clone/链接/badge）修正；历史任务卡与问诊记录中的旧仓 URL 属史实描述不改写（旧仓 Archive 后仍可访问，最终删除前再评估）
-- [ ] feishu Pages 迁移：按 integrations/feishu/MIGRATION-NOTE 重新配置 Pages 源，验证新 URL 可访问
-- [ ] .github/workflows 路径适配（若旧仓带 CI）
+- [x] feishu Pages 迁移：按 integrations/feishu/MIGRATION-NOTE 重新配置 Pages 源，验证新 URL 可访问
+- [x] .github/workflows 路径适配（若旧仓带 CI）
 - [ ] workspace-index 注册表切换唯一入口
 - [ ] 新仓 AI 可读性验收：陌生 Agent 只读本仓能答「平台有哪些能力/记忆协议在哪/飞书导出在哪」
 - [ ] 旧三仓 Archive（冷却 30-60 天后经人工确认再删）

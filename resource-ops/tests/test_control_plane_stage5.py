@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, r"D:\AI平台-B\resource-ops")
+sys.path.insert(0, r"D:\AI平台\resource-ops")
 
 from control_plane import state as state_mod      # noqa: E402
 from control_plane import lease as lease_mod      # noqa: E402

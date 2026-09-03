@@ -18,12 +18,12 @@
 | `exporter/check_changed.py` | `ONLINE_INDEX` → `…/ai-platform/resource-ops/index.json` |
 | `exporter/export.py` | 导出 JSON `repo` 字段 → `…/ai-platform/tree/main/resource-ops` |
 | `scheduler/sync.py` | `REMOTE_BASE` → `…/ai-platform/resource-ops` |
-| `feishu/backfill_ei_new_resources.py` | 本地路径 `D:/ai-resource-hub/docs/资源调研` → `D:/AI平台-B/resource-ops/docs/资源调研` |
-| `tests/test_control_plane_stage5.py` | `sys.path` `D:\ai-resource-hub` → `D:\AI平台-B\resource-ops` |
-| `scheduler/_test_cfg.json` | `db_path`/`credentials_path` `D:\项目\ai-resource-hub\…` → `D:\AI平台-B\resource-ops\…` |
+| `feishu/backfill_ei_new_resources.py` | 本地路径 `D:/ai-resource-hub/docs/资源调研` → `D:/AI平台/resource-ops/docs/资源调研` |
+| `tests/test_control_plane_stage5.py` | `sys.path` `D:\ai-resource-hub` → `D:\AI平台\resource-ops` |
+| `scheduler/_test_cfg.json` | `db_path`/`credentials_path` `D:\项目\ai-resource-hub\…` → `D:\AI平台\resource-ops\…` |
 | `sync/README.md` | `--repo ai-resource-hub` → `--repo ai-platform` |
-| `sync/sync_config.json` | repos 条目 `ai-resource-hub`→`ai-platform`（path `D:\ai-resource-hub`→`D:\AI平台-B`）；feishu 导出 name/cwd → `ai-platform resource-ops` / `D:\AI平台-B\resource-ops` |
-| `docs/Claude调度大脑_接入规范_2026-08-30.md` | 仓库名与运行路径（`cd /d/ai-resource-hub/sync` → `/d/AI平台-B/resource-ops/sync`）及"已配置仓库"列表改为 ai-platform |
+| `sync/sync_config.json` | repos 条目 `ai-resource-hub`→`ai-platform`（path `D:\ai-resource-hub`→`D:\AI平台`）；feishu 导出 name/cwd → `ai-platform resource-ops` / `D:\AI平台\resource-ops` |
+| `docs/Claude调度大脑_接入规范_2026-08-30.md` | 仓库名与运行路径（`cd /d/ai-resource-hub/sync` → `/d/AI平台/resource-ops/sync`）及"已配置仓库"列表改为 ai-platform |
 
 ## 保留未改（历史归档）
 
