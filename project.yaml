@@ -1,0 +1,26 @@
+id: AI平台
+name: AI 平台（ai-platform）
+github: https://github.com/201650545/ai-platform
+visibility: public
+type: ai-infrastructure
+
+描述: >
+  AI 基建主仓：多网关 API 聚合、AI 搜索、GitHub 管理、飞书集成、
+  Agent 记忆协议、AI 资源运营。由 ai-hub / ai-resource-hub /
+  feishu-data-hub / ai-hub-memory(协议) 整合而成（2026-09-03 迁移启动）。
+
+modules:
+  - path: ./
+    from: ai-hub
+    desc: 平台主干（网关/搜索/GitHub管理/飞书同步）
+  - path: resource-ops/
+    from: ai-resource-hub
+    desc: AI 自助资源运营体系
+  - path: integrations/feishu/
+    from: feishu-data-hub
+    desc: 飞书多维表格导出（GitHub Pages 管线）
+  - path: agent/memory/
+    from: ai-hub-memory
+    desc: 记忆协议文档（运行数据仍在原仓）
+
+规则: 本项目遵循 D:/通用规范（handbook）；差异写在本仓 README 与模块 README。
