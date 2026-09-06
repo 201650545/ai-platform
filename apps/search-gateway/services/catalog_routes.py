@@ -14,8 +14,10 @@ GPT 三拆重构（2026-09-05）：把网关配置按职责拆成三份，落地
     回落到原有 model_providers 逻辑，保证本轮重构不破坏现役行为。
 """
 import os
+import time
 
 import channels as _ch
+import fault_domains
 
 # 三个配置文件统一放在子项目 data/ 下
 _FILE_MAP = {
@@ -35,8 +37,11 @@ def _load(tag):
 
 # ---------------------------------------------------------------- ① 产品目录
 def catalog():
-    """model_catalog.json：{ alias: {display, billing, tier, use, ...} }。"""
-    return _load("catalog")
+    """model_catalog.json：{ alias: {display, billing, tier, use, ...} }。文件带头，模型在 models 子键下，拆包。"""
+    d = _load("catalog")
+    if isinstance(d, dict) and isinstance(d.get("models"), dict):
+        return d["models"]
+    return d
 
 
 def catalog_entry(alias):
@@ -49,8 +54,11 @@ def all_aliases():
 
 # ---------------------------------------------------------------- ② 路由（显式备用链）
 def routes():
-    """model_routes.json：{ alias: {primary:{channel,model}, backup:[...], fallback_policy:{...}} }。"""
-    return _load("routes")
+    """model_routes.json：{ alias: {primary:{channel,model}, backup:[...], fallback_policy:{...}} }。文件带头，路由在 routes 子键下，拆包。"""
+    d = _load("routes")
+    if isinstance(d, dict) and isinstance(d.get("routes"), dict):
+        return d["routes"]
+    return d
 
 
 def route_for(alias):
@@ -114,3 +122,62 @@ def summary():
             "channels": len(registry()),
         },
     }
+
+
+# ---------------------------------------------------------------- ④ 同模多渠道成员池（ADR-003）
+def members_of(alias):
+    """route 的 members[]（{channel, model}，同模跨渠道）；无 → []。"""
+    r = route_for(alias)
+    return (r or {}).get("members") or []
+
+
+# 模型级 429/breaker 冷却（分层于故障域之上）：(channel, model) -> until_ts
+_model_cooldown: dict = {}
+
+
+def mark_member_cooldown(channel, model, seconds=30):
+    """成员在某次请求被 429/breaker 判失败后记冷却；冷却期内 select_members 跳过该成员。"""
+    _model_cooldown[(channel, model)] = time.time() + seconds
+
+
+def member_in_cooldown(channel, model):
+    until = _model_cooldown.get((channel, model))
+    if until is None:
+        return False
+    if time.time() >= until:
+        _model_cooldown.pop((channel, model), None)
+        return False
+    return True
+
+
+def healthy_members(alias):
+    """按 enabled / 故障域熔断 / 模型级冷却 过滤成员，返回 [(channel, real_model)]（保持 members 顺序）。"""
+    out = []
+    for m in members_of(alias):
+        cid = m.get("channel")
+        mdl = m.get("model")
+        if not cid or not mdl:
+            continue
+        if not channel_enabled(cid):
+            continue
+        if member_in_cooldown(cid, mdl):
+            continue
+        try:
+            if fault_domains.is_tripped(cid):
+                continue
+        except Exception:  # noqa: BLE001
+            pass
+        out.append((cid, mdl))
+    return out
+
+
+def has_member_pool(alias):
+    """route 是否声明了成员池（含 primary 为假 pin 时仍以池为准）。"""
+    return bool(members_of(alias))
+
+
+def select_members(alias):
+    """ADR-003 池选路：alias 有 members[] → 返回健康成员的 [(channel, real_model)] 顺序链；否则 []。"""
+    if not members_of(alias):
+        return []
+    return healthy_members(alias)

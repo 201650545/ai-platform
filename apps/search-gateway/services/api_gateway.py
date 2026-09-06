@@ -520,22 +520,42 @@ class _PrependResponse:
                 pass
 
 
+def _mark_pool_cooldown(model, cid, real_model, outcome):
+    """ADR-003：成员池模型的模型级冷却。仅当该 model 用了成员池，且本成员因上游不稳
+    （breaker/rate_limit/timeout/通用异常）失败时记冷却，冷却期内 select_members 跳过该成员。
+    本地判定（capability/resource）与 content_filter（内容问题非成员本身不稳）不标记。"""
+    if not catalog_routes.has_member_pool(model):
+        return
+    if upstream_outcome.is_breaker(outcome) or outcome in (
+            upstream_outcome.Outcome.RATE_LIMIT, upstream_outcome.Outcome.TIMEOUT):
+        catalog_routes.mark_member_cooldown(cid, real_model)
+
+
 def route_completion(payload):
     """按模型路由到渠道候选链，逐个尝试，返回 (渠道id, response, log_entry) 或 (None, errors, log_entry)。
     模型名自动映射：用户请求 deepseek-v4-flash，转发到 modelscope 时改为
     deepseek-ai/DeepSeek-V4-Flash-0731（该渠道实际模型名），保证上游能识别。"""
     model = payload.get("model", "")
-    # 候选链 + 每个渠道对应的实际模型名
-    providers = channels.model_providers(model)
-    if providers:
-        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers if p.get("reachable")]
+    # ADR-003：同模多渠道成员池优先（route 声明了 members[] 的模型，如 glm-flash）。
+    # select_members 已按 渠道enabled/故障域熔断/模型级冷却 过滤，直接作候选链；
+    # 无成员池 → 回落原单渠道/默认链逻辑，不破坏现役行为。
+    pool_chain = catalog_routes.select_members(model)
+    if pool_chain:
+        chain = list(pool_chain)
+        source = "member_pool"
     else:
-        chain = [(cid, model) for cid in channels.model_to_chain(model)]
-    if not chain:  # 规则 pin 的渠道全不可达/未配 key → 兜底 DEFAULT_CHAIN（跳过停用渠道），避免空链 502
-        chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
-                 for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+        providers = channels.model_providers(model)
+        if providers:
+            chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers if p.get("reachable")]
+        else:
+            chain = [(cid, model) for cid in channels.model_to_chain(model)]
+        if not chain:  # 规则 pin 的渠道全不可达/未配 key → 兜底 DEFAULT_CHAIN（跳过停用渠道），避免空链 502
+            chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
+                     for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+        source = "legacy"
 
     # P1 B′：代理故障域熔断时，把配置的直连热备渠道（sensetime/CF 等）升到链首，恢复自动回落
+    # （池链同样适用：池内也可能含代理渠道）
     chain = fault_domains.promote_on_proxy_down(chain)
 
     # 构建路由日志入口（记录 attempted 和 resolved，稍后补 full 信息）
@@ -543,6 +563,7 @@ def route_completion(payload):
     log_entry = {
         "ts": time.strftime("%H:%M:%S"),
         "client_model": model,
+        "route_source": source,
         "attempted": attempted,
         "attempted_class": _peek_chain(chain),  # 纯观测：不参与判定
         "resolved_channel": None,
@@ -629,6 +650,7 @@ def route_completion(payload):
                     errors.append(cid + ": " + outcome.value + "（空壳/错误载荷）")
                     log_entry["errors"] = list(errors)
                     log_entry["failures"] = list(failures)
+                    _mark_pool_cooldown(model, cid, real_model, outcome)
                     continue
                 resp = _BufferedResponse(raw, ctype)
                 # 验证通过后记录成功（P0-1：延迟到 shell 检测后，避免 200 提前清零 consec429）
@@ -673,6 +695,7 @@ def route_completion(payload):
             errors.append(cid + ": HTTP " + str(he.code) + " [" + outcome.value + "] " + detail)
             log_entry["errors"] = list(errors)
             log_entry["failures"] = list(failures)
+            _mark_pool_cooldown(model, cid, real_model, outcome)
         except RateLimitSkip as rle:
             # 95% 提前切换（task_045）：该渠道配额桶满/熔断，走用户顺序里的下一渠道
             failures.append({"channel": cid, "outcome": upstream_outcome.Outcome.RATE_LIMIT.value,
@@ -680,6 +703,7 @@ def route_completion(payload):
             errors.append(cid + ": " + str(rle))
             log_entry["errors"] = list(errors)
             log_entry["failures"] = list(failures)
+            _mark_pool_cooldown(model, cid, real_model, upstream_outcome.Outcome.RATE_LIMIT)
         except Exception as e:  # noqa: BLE001
             outcome = upstream_outcome.classify_exception(e)
             # 故障域：代理渠道传输/超时失败（连接拒绝/重置等）→ 整域计数，防反复重打死代理
@@ -690,6 +714,7 @@ def route_completion(payload):
             errors.append(cid + ": " + outcome.value + " " + str(e)[:120])
             log_entry["errors"] = list(errors)
             log_entry["failures"] = list(failures)
+            _mark_pool_cooldown(model, cid, real_model, outcome)
 
     log_entry["errors"] = errors
     log_entry["failures"] = failures
@@ -702,14 +727,19 @@ def build_route_plan(model, payload=None):
     只读，不预占配额、不触发上游请求。排障时不用猜"为什么没走第二家"。
     payload 提供时按请求硬能力验算 capability_mismatch（与 route_completion 同一判定）。"""
     payload = payload or {"model": model}
-    providers = channels.model_providers(model)
-    if providers:
-        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers]
+    # ADR-003：与 route_completion 保持同一决策 —— 成员池模型优先展示池链
+    pool_chain = catalog_routes.select_members(model)
+    if pool_chain:
+        chain = list(pool_chain)
     else:
-        chain = [(cid, model) for cid in channels.model_to_chain(model)]
-    if not chain:
-        chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
-                 for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+        providers = channels.model_providers(model)
+        if providers:
+            chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers]
+        else:
+            chain = [(cid, model) for cid in channels.model_to_chain(model)]
+        if not chain:
+            chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
+                     for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
 
     health = channels.cached_health_all()
     ledger = _rate_ledger() if _rate_ledger else {}
