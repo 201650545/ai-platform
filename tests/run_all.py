@@ -29,10 +29,15 @@ def test_secret_scan():
     except Exception as e:  # noqa: BLE001
         return Result("敏感信息扫描", Result.SKIP, f"扫描异常: {e}")
     # 过滤示例/占位文件（含 your-...-here / example / .example 命名）
+    # resource-ops/tests/ 下用例故意注入伪 Bearer/sk- 以断言校验器能拦截，
+    # 属测试夹具而非真实密钥，显式放行该目录，真实 key 入库仍会命中。
+    FIXTURE_ROOT = "resource-ops/tests"
     hits = []
     for line in (r.stdout or "").splitlines():
         low = line.lower()
         if ".example" in low or "your-" in low and "here" in low or "xxx" in low:
+            continue
+        if line.split(":", 1)[0].replace("\\", "/").startswith(FIXTURE_ROOT):
             continue
         hits.append(line)
     if not hits:
