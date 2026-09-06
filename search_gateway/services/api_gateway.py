@@ -1,0 +1,1936 @@
+# -*- coding: utf-8 -*-
+"""
+API 转发网关 (API Gateway) v1 —— 不同厂商 API 聚合转发，独立于 AI 搜索网关
+============================================================
+- GET  /api/channels          → 全部 LLM 渠道健康状态
+- POST /api/channels/<id>/key → 保存渠道 key 到 channels.json
+- POST /api/channels/<id>/test→ 渠道测速
+- GET  /v1/models             → 聚合各渠道可用模型
+- POST /v1/chat/completions   → OpenAI 兼容，多渠道路由 + fallback
+- GET  /api/health            → 渠道健康
+- GET  /api/routing           → 读取全部手动路由规则
+- PUT  /api/routing           → 设置某模型的手动渠道顺序（"搭积木"）
+- DELETE /api/routing?model=  → 清除某模型规则，恢复自动排序
+- GET  /api/switch            → 读取总开关状态（enabled）
+- PUT  /api/switch            → 开/关总开关（关闭后 /v1/chat 返回 503）
+- PUT  /api/channels/<id>/enabled → 渠道启用/停用（停用后路由与模型列表全部跳过）
+- GET  /api/gateway-info      → 接入信息（本机/局域网地址、鉴权方式）
+- GET  /img/<name>            → web/img/ 静态图片（页面配图）
+- GET  /api/usage             → 今日 + 累计用量（按渠道 calls/tokens/errors）
+- GET  /api/model-overrides   → 自定义模型 + 隐藏模型配置
+- POST /api/model-overrides/custom   → 新增自定义模型 {name, channel, model}
+- DELETE /api/model-overrides/custom?name= → 删除自定义模型
+- PUT  /api/model-overrides/hidden  → 设置隐藏模型列表 {hidden: [...]}
+
+端口：3100（AI 搜索网关在 3000，两者独立）
+依赖：channels.py（LLM 渠道层）、quota.py（本地额度统计）
+"""
+import http.server
+import socketserver
+import json
+import os
+import sys
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import re
+import ipaddress
+from datetime import date, timedelta
+
+import upstream_outcome
+import capabilities
+import pricing
+import fault_domains
+
+# P4.2 资源控制平面（可选依赖）：模块缺失/损坏时网关按"无资源配置"运行，不阻断主链路。
+try:
+    import resource_config as _rcfg
+except Exception:  # noqa: BLE001
+    _rcfg = None
+
+# :3100 独立记账，与 :3000 搜索网关的 quota 分开（在 import channels 前设环境变量）
+os.environ.setdefault("GATEWAY_ID", "api_gateway")
+
+import channels
+import catalog_routes
+
+try:
+    import sync_cherry as _sync_cherry
+except Exception:  # noqa: BLE001
+    _sync_cherry = None
+
+try:
+    from quota import get_usage as _get_usage
+except Exception:  # noqa: BLE001
+    _get_usage = None
+
+try:
+    from rate_limit import ledger as _rate_ledger, events as _rate_events, RateLimitSkip
+except Exception:  # noqa: BLE001
+    _rate_ledger = None
+    _rate_events = None
+
+    class RateLimitSkip(Exception):
+        """占位：rate_limit 模块不可用时保持 except 分支可解析。"""
+
+PORT = int(os.environ.get("API_GATEWAY_PORT", "3100"))
+# 绑定地址（GPT R2 裁定 R2-GW-BIND-NARROW-2026-0829 + Claude 评审发现项）：
+# - 默认 127.0.0.1 仅本机；空值/空白必须回退本机（空串会被 Python 解释为 INADDR_ANY 意外全接口绑定 → fail closed）
+# - 全接口/wildcard 地址（0.0.0.0、:: 及其展开形式 0:0:0:0:0:0:0:0、IPv4 映射 ::ffff:0.0.0.0）
+#   需 API_GATEWAY_ALLOW_WILDCARD=1 显式授权，否则拒绝启动（fail closed）
+BIND_RAW = (os.environ.get("API_GATEWAY_BIND") or "").strip()
+BIND_HOST = BIND_RAW or "127.0.0.1"
+
+
+def _is_wildcard_addr(addr):
+    """判断是否为全接口监听地址（含 IPv6 展开/映射形式，Claude 评审发现项）。"""
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    if ip.version == 4:
+        return ip == ipaddress.IPv4Address("0.0.0.0")
+    return ip.is_unspecified or (
+        ip.ipv4_mapped is not None and ip.ipv4_mapped == ipaddress.IPv4Address("0.0.0.0")
+    )
+
+
+BIND_WILDCARD_UNAUTHORIZED = _is_wildcard_addr(BIND_RAW) and os.environ.get("API_GATEWAY_ALLOW_WILDCARD") != "1"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATE_JSON = os.path.join(channels.DATA_DIR, "api_state.json")
+EXPIRY_JSON = os.path.join(channels.DATA_DIR, "channel_expiry.json")
+# 派发运行实况目录（dispatch.py 的 log_live 落盘处，与 dispatch_history.jsonl 同级）
+DISPATCH_LIVE_DIR = os.path.join(os.path.dirname(BASE_DIR), "dispatch_live")
+
+
+def load_state():
+    """读取总开关状态。默认开启。"""
+    try:
+        with open(STATE_JSON, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {"enabled": True}
+
+
+def _write_state(st):
+    with open(STATE_JSON, "w", encoding="utf-8") as f:
+        json.dump(st, f, ensure_ascii=False, indent=2)
+
+
+def save_state(enabled):
+    # 合并写：保留 api_key 等其他字段，避免开关切换把 key 抹掉
+    st = load_state()
+    st["enabled"] = bool(enabled)
+    _write_state(st)
+
+
+def is_enabled():
+    return bool(load_state().get("enabled", True))
+
+
+def trigger_cherry_sync():
+    """后台触发 网关→Cherry Studio 同步（渠道配置变更后调用，不阻塞响应）。"""
+    if _sync_cherry is None:
+        return
+    try:
+        t = threading.Thread(target=_sync_cherry.run_sync, kwargs={"dry": False}, daemon=True)
+        t.start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# ---------------------------------------------------------------- 网关 API key 鉴权
+def get_api_key():
+    """网关级 API key（空串 = 未启用鉴权，保持内网全通的旧行为）。"""
+    return (load_state().get("api_key") or "").strip()
+
+
+def save_api_key(key):
+    st = load_state()
+    st["api_key"] = key
+    _write_state(st)
+
+
+def load_expiry():
+    """读取渠道/模型有效期标注。"""
+    try:
+        with open(EXPIRY_JSON, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def save_expiry(data):
+    with open(EXPIRY_JSON, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def _resource_block(cid, client_model, upstream_model=None):
+    """P4.2 资源控制平面 gating：按 (channel, unified_model) 精确配对封禁。
+    资源表登记的是客户端可见模型名，故以 client_model 为主键匹配；上游名兜底
+    （防止资源表登记上游名时漏判）。返回 None（放行）或 (reason, resource_id)。
+    模块缺失/异常一律放行，不阻断主链路。"""
+    if _rcfg is None:
+        return None
+    try:
+        rb = _rcfg.channel_block(cid, client_model)
+        if rb is None and upstream_model and upstream_model != client_model:
+            rb = _rcfg.channel_block(cid, upstream_model)
+        return rb
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _resource_status():
+    """资源配置热加载状态（只读运行元数据，不含配置内容/密钥）。"""
+    if _rcfg is None:
+        return {"loaded": False, "last_reload_status": "module_unavailable"}
+    try:
+        return _rcfg.status_payload()
+    except Exception as exc:  # noqa: BLE001
+        return {"loaded": False, "last_reload_status": "error", "error": str(exc)[:200]}
+
+
+def _needs_auth(path):
+    # 页面本体与静态图不保护；/api/* 与 /v1/* 全部纳入鉴权范围
+    # /healthz 为免鉴权存活探针（不暴露任何渠道数据，供服务健康检查用）
+    # /api/resource-config/status 只读健康/观测端点（仅含加载状态元数据，无配置无密钥），免鉴权
+    # /dispatch + /api/dispatch/status 派发中心可视化（只读观测，无配置无密钥），免鉴权
+    # /speed + /api/speed/test 每日渠道测速可视化（只读观测，无配置无密钥），免鉴权
+    if path in ("/", "/index.html", "/dispatch", "/dispatch/live", "/healthz",
+                "/api/resource-config/status", "/api/dispatch/status",
+                "/speed", "/api/speed/test", "/api_page.html"):
+        return False
+    # /dispatch/live 三级页数据（/api/dispatch/live/list 与 /api/dispatch/live/<task_id>）：
+    # 只读运行实况观测，无配置无密钥 → 免鉴权
+    if path.startswith("/api/dispatch/live"):
+        return False
+    if path.startswith("/img/"):
+        return False
+    return True
+
+
+def usage_summary():
+    """今日 + 累计用量。返回 today/today_usage/total/by_channel。"""
+    import time as _t
+    today = _t.strftime("%Y-%m-%d")
+    today_usage = _get_usage(gateway_id="api_gateway", date=today) if _get_usage else {}
+    total = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "errors": 0}
+    by_channel = {}
+    try:
+        with open(os.path.join(channels.DATA_DIR, "api_gateway", "quota.json"),
+                  "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for day, chs in (data or {}).items():
+            for cid, v in (chs or {}).items():
+                v = v or {}
+                for k in total:
+                    total[k] += int(v.get(k, 0))
+                b = by_channel.setdefault(cid, {"calls": 0, "input_tokens": 0,
+                                                 "output_tokens": 0, "errors": 0})
+                for k in b:
+                    b[k] += int(v.get(k, 0))
+    except Exception:  # noqa: BLE001
+        pass
+    return {"today": today, "today_usage": today_usage,
+            "total": total, "by_channel": by_channel}
+
+
+# ---------------------------------------------------------------- 路由日志（线程安全）
+_ROUTE_LOG = []
+_ROUTE_LOG_LOCK = threading.Lock()
+_ROUTE_LOG_MAX = 200  # 最多保留 200 条（用户 2026-08-29 要求扩大可见范围）
+# 路由日志落盘（2026-08-30 用户要求：重启后仍可查"调用确认走了"）。与 quota 同目录按网关隔离。
+_ROUTE_LOG_FILE = os.path.join(channels.DATA_DIR, "api_gateway", "route_log.jsonl")
+
+# 价格观测（P2 缩窄版）：内存环形重启即丢，故另存 JSONL。
+# 本段代码是**纯观测**，不参与任何放行判定；写失败只损失该条 telemetry。
+_PRICING_TELEMETRY = os.path.join(channels.DATA_DIR, "pricing_telemetry.jsonl")
+_TELEMETRY_ERRORS = {"count": 0, "disabled": False}
+_TELEMETRY_MAX_ERRORS = 20  # 连续失败到阈值即自禁用，避免磁盘异常时反复撞 I/O
+_TELEMETRY_KEYS = ("ts", "client_model", "attempted", "attempted_class",
+                   "resolved_channel", "resolved_model", "resolved_class", "fallback_count")
+
+
+def _peek_chain(chain):
+    """给候选链每个位置贴价格类别标签（纯观测）。任何异常返回 []，不影响路由。"""
+    try:
+        out = []
+        for cid, real_model in chain:
+            p = pricing.peek_class(cid, real_model) or {}
+            out.append({"channel": cid, "model": real_model,
+                        "class": p.get("class"), "source": p.get("source")})
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _write_telemetry(entry):
+    """落一行 JSONL：候选类别 + 实际落点 + fallback 深度，供离线统计。"""
+    if _TELEMETRY_ERRORS["disabled"]:
+        return
+    try:
+        rec = {k: entry.get(k) for k in _TELEMETRY_KEYS}
+        rec["epoch"] = int(time.time())
+        rec["failure_count"] = len(entry.get("failures") or [])
+        with open(_PRICING_TELEMETRY, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        _TELEMETRY_ERRORS["count"] = 0
+    except Exception:  # noqa: BLE001
+        _TELEMETRY_ERRORS["count"] += 1
+        if _TELEMETRY_ERRORS["count"] >= _TELEMETRY_MAX_ERRORS:
+            _TELEMETRY_ERRORS["disabled"] = True
+
+
+def _log_route(entry):
+    """记录一次路由决策（调用方填好 entry 后再锁）。内存 + JSONL 落盘双写。"""
+    with _ROUTE_LOG_LOCK:
+        _ROUTE_LOG.append(dict(entry))
+        if len(_ROUTE_LOG) > _ROUTE_LOG_MAX:
+            del _ROUTE_LOG[:len(_ROUTE_LOG) - _ROUTE_LOG_MAX]
+        try:
+            os.makedirs(os.path.dirname(_ROUTE_LOG_FILE), exist_ok=True)
+            with open(_ROUTE_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:  # noqa: BLE001  落盘失败只损失该条，不影响路由主流程
+            pass
+    _write_telemetry(entry)
+
+
+def _read_route_log_file(limit=200):
+    """读落盘 route_log.jsonl 尾部至多 limit 条（正序）。文件很大时只读尾部。"""
+    try:
+        with open(_ROUTE_LOG_FILE, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            buf, offset, chunk = b"", size, 65536
+            while offset > 0 and len(buf) < chunk * 16:  # 最多向后读 ~1MB
+                start = max(0, offset - chunk)
+                f.seek(start)
+                buf = f.read(offset - start) + buf
+                offset = start
+                if buf.count(b"\n") >= limit * 2:
+                    break
+        out = []
+        for line in buf.decode("utf-8", "ignore").splitlines()[-limit:]:
+            try:
+                out.append(json.loads(line))
+            except Exception:  # noqa: BLE001  坏行跳过
+                pass
+        return out
+    except Exception:  # noqa: BLE001  文件不存在/不可读 → 无历史
+        return []
+
+
+class _BufferedResponse:
+    """已读入内存的上游响应替身（与 HTTPResponse 同形：getheader/read）。"""
+
+    def __init__(self, raw, ctype):
+        self._raw, self._ctype = raw, ctype
+
+    def getheader(self, name, default=None):
+        return self._ctype if (name or "").lower() == "content-type" else default
+
+    def read(self):
+        return self._raw
+
+
+def _looks_like_shell(raw):
+    """空壳响应检测：HTTP 200 但 JSON 无有效 choices（或带 error）→ 该渠道视为失败。"""
+    try:
+        d = json.loads(raw.decode("utf-8", "ignore"))
+    except Exception:  # noqa: BLE001
+        return True  # 非 JSON 的 200 也不可信
+    return not d.get("choices") or bool(d.get("error"))
+
+
+def _has_content_filter_only(raw):
+    """检测非流式响应「只有思考、正文被上游安全过滤」：finish_reason=content_filter 且无任何正文。
+    是 → 该渠道视为失败换下一渠道（Fast 模型多次在此处"想完就停"，Harness 把归一化后的
+    stop 当正常结束）；有正文 → 保留部分内容走下游归一化。"""
+    try:
+        d = json.loads(raw.decode("utf-8", "ignore"))
+    except Exception:  # noqa: BLE001
+        return False
+    if not isinstance(d, dict) or not d.get("choices"):
+        return False
+    filtered = False
+    for ch in d["choices"]:
+        if not isinstance(ch, dict):
+            continue
+        if ch.get("finish_reason") == "content_filter":
+            filtered = True
+        msg = ch.get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, str) and content.strip():
+            return False  # 有正文，不算纯过滤
+    return filtered
+
+
+def _peek_stream(resp, limit=4096):
+    """流式首包验证：读出首批字节检查是否空壳/错误事件。
+    返回 (是否通过, 已读字节)。判定保守——半包 JSON / 心跳注释等无法判定时一律放行；
+    但「扫完首批、解析出了完整事件、却没有一个事件带 choices」视为错误载荷：
+    小红书等渠道把额度耗尽包在非 OpenAI 形状的 200 流里，旧逻辑兜底放行会把它当成功，
+    导致统一组每次重试都停在第一个成员上不切换（2026-08-26 fast 组故障转移 bug 根因）。"""
+    try:
+        buf = resp.read(limit)
+    except Exception:  # noqa: BLE001
+        return False, b""
+    if not buf:
+        return False, buf
+    text = buf.decode("utf-8", "ignore")
+    saw_choices = False
+    saw_event = False
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if not data:
+            continue
+        if data == "[DONE]":
+            if saw_choices:
+                continue  # 内容已出现后正常收尾，继续看后续行
+            return False, buf  # 首个事件即结束 = 空流
+        try:
+            obj = json.loads(data)
+        except Exception:  # noqa: BLE001
+            continue  # 半包判不了 → 看下一行
+        if not isinstance(obj, dict):
+            continue
+        saw_event = True
+        if obj.get("error"):
+            return False, buf
+        if obj.get("choices"):
+            return True, buf
+    if saw_event and not saw_choices:
+        return False, buf  # 完整事件但全无 choices → 错误/控制载荷（如额度尽提示）
+    return True, buf
+
+
+def _peek_stream_decision(resp, max_buf=512 * 1024):
+    """流式「缓冲至决策」：读正文首个 delta 或遇收尾/错误前，只缓冲不外发。
+
+    返回 (决策, 缓冲字节, Outcome|None)：
+      - ("commit", head, None)            → 已出现正文/正常收尾 → 回放 head 后透传
+      - ("content_filter", head, outcome) → 只有思考、正文被安全过滤 → 换下一渠道
+      - ("fail", head, outcome)           → 空流/错误载荷 → 换下一渠道
+
+    决策依据（Fast 模型多次在"想完就停"处，正文被上游安全过滤返回
+    finish_reason=content_filter，若不处理会被归一化为 stop 让客户端当正常结束）：
+      - delta.content 非空字符串              → 正文已出现，commit（此后不可 failover）
+      - finish_reason=content_filter 且无正文 → content_filter（上游本身健康，非 breaker）
+      - error / 无 choices 的控制事件          → fail
+      - [DONE] 且无正文                        → commit（正常空收尾）
+      - 缓冲超上限                             → commit（防病态流挂起）
+    """
+    bufs = []
+    total = 0
+    carry = b""
+    body_seen = False
+    done = False
+    while total <= max_buf:
+        try:
+            chunk = resp.read(4096)
+        except Exception:  # noqa: BLE001
+            return "fail", b"".join(bufs), upstream_outcome.Outcome.PROTOCOL_ERROR
+        if not chunk:
+            break
+        bufs.append(chunk)
+        total += len(chunk)
+        buf = carry + chunk
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            line = line.strip()
+            if not line.startswith(b"data:"):
+                continue
+            data = line[5:].strip()
+            if not data:
+                continue
+            if data == b"[DONE]":
+                done = True
+                break
+            try:
+                obj = json.loads(data.decode("utf-8", "ignore"))
+            except Exception:  # noqa: BLE001
+                continue  # 半包 JSON：留在 carry 里跨 chunk 拼接后再判
+            if not isinstance(obj, dict):
+                continue
+            if obj.get("error"):
+                return "fail", b"".join(bufs), upstream_outcome.Outcome.PROTOCOL_ERROR
+            choices = obj.get("choices")
+            if not choices:
+                continue  # usage/keep-alive 等控制事件，继续缓冲
+            for ch in choices:
+                if not isinstance(ch, dict):
+                    continue
+                delta = ch.get("delta") or {}
+                if isinstance(delta.get("content"), str) and delta["content"].strip():
+                    body_seen = True
+                    return "commit", b"".join(bufs), None
+                fr = ch.get("finish_reason")
+                if fr == "content_filter":
+                    return "content_filter", b"".join(bufs), upstream_outcome.Outcome.CONTENT_FILTER
+                if fr not in (None, ""):
+                    return "commit", b"".join(bufs), None  # stop/length 等正常收尾
+        carry = buf
+        if done:
+            break
+    if done or total > max_buf:
+        return "commit", b"".join(bufs), None
+    if not bufs:
+        return "fail", b"", upstream_outcome.Outcome.PROTOCOL_ERROR  # 空流
+    return "commit", b"".join(bufs), None  # 读到 EOF 但已有事件（透传给下游补错误收尾）
+
+
+class _PrependResponse:
+    """把首包验证时读掉的字节回放、再接续上游的响应包装（配额记录仍走原 _QuotaResponse）。"""
+
+    def __init__(self, head, resp):
+        self._head, self._resp = head, resp
+
+    def getheader(self, name, default=None):
+        return self._resp.getheader(name, default)
+
+    def read(self, size=-1):
+        if self._head:
+            if size is None or size < 0:
+                out, self._head = self._head + self._resp.read(), b""
+                return out
+            out, self._head = self._head[:size], self._head[size:]
+            return out
+        return self._resp.read(size)
+
+    def close(self):
+        try:
+            self._resp.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def force_finalize(self):
+        """透传兜底记账到内层 _QuotaResponse（客户端提前断开时 read 循环不再触发记录）。"""
+        f = getattr(self._resp, "force_finalize", None)
+        if f:
+            try:
+                f()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def route_completion(payload):
+    """按模型路由到渠道候选链，逐个尝试，返回 (渠道id, response, log_entry) 或 (None, errors, log_entry)。
+    模型名自动映射：用户请求 deepseek-v4-flash，转发到 modelscope 时改为
+    deepseek-ai/DeepSeek-V4-Flash-0731（该渠道实际模型名），保证上游能识别。"""
+    model = payload.get("model", "")
+    # 候选链 + 每个渠道对应的实际模型名
+    providers = channels.model_providers(model)
+    if providers:
+        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers if p.get("reachable")]
+    else:
+        chain = [(cid, model) for cid in channels.model_to_chain(model)]
+    if not chain:  # 规则 pin 的渠道全不可达/未配 key → 兜底 DEFAULT_CHAIN（跳过停用渠道），避免空链 502
+        chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
+                 for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+
+    # P1 B′：代理故障域熔断时，把配置的直连热备渠道（sensetime/CF 等）升到链首，恢复自动回落
+    chain = fault_domains.promote_on_proxy_down(chain)
+
+    # 构建路由日志入口（记录 attempted 和 resolved，稍后补 full 信息）
+    attempted = [cid for cid, _ in chain]
+    log_entry = {
+        "ts": time.strftime("%H:%M:%S"),
+        "client_model": model,
+        "attempted": attempted,
+        "attempted_class": _peek_chain(chain),  # 纯观测：不参与判定
+        "resolved_channel": None,
+        "resolved_model": None,
+        "resolved_class": None,
+        "fallback_count": 0,
+        "errors": [],
+        "failures": [],
+    }
+
+    errors = []
+    failures = []
+    required_caps = capabilities.required_capabilities(payload)
+    deadline = time.monotonic() + fault_domains.config().get("request_deadline_s", 30)
+    for i, (cid, real_model) in enumerate(chain):
+        if time.monotonic() >= deadline:
+            break
+        # capability admission（PR #2）：任何上游访问/key/配额之前的最前置本地判定。
+        # mismatch = 本地 routing decision，不是上游 failure：不调 chat_completion、
+        # 不耗 key、不碰 try_acquire/breaker/mark_shell_failure。
+        cap = capabilities.check_candidate(cid, real_model, payload)
+        if not cap["eligible"]:
+            failures.append({"channel": cid, "outcome": "capability_mismatch",
+                             "detail": "missing capabilities: " + ",".join(cap["mismatch"]),
+                             "capability_mismatch": {"required": cap["required"],
+                                                     "unsupported": cap["mismatch"],
+                                                     "unknown": cap["unknown"],
+                                                     "source": cap["source"]}})
+            errors.append(cid + ": capability_mismatch " + ",".join(cap["mismatch"]))
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+            continue
+        # 资源控制平面 gating（P4.2）：capability 之后、key/配额之前的本地判定。
+        # 按 (channel, unified_model) 精确配对封禁；未覆盖 = 放行（fail-open 只针对"无配置"）。
+        rb = _resource_block(cid, model, real_model)
+        if rb is not None:
+            failures.append({"channel": cid, "outcome": rb[0],
+                             "detail": "resource-config: " + rb[1]})
+            errors.append(cid + ": " + rb[0] + "（" + rb[1] + "）")
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+            continue
+        if not channels.key_is_set(cid):
+            errors.append(cid + ": 未配置 key")
+            continue
+        try:
+            p2 = dict(payload)
+            p2["model"] = real_model  # 映射为该渠道实际模型名
+            log_entry["resolved_channel"] = cid
+            log_entry["resolved_model"] = real_model
+            log_entry["resolved_class"] = (pricing.peek_class(cid, real_model) or {}).get("class")
+            log_entry["fallback_count"] = i
+            if fault_domains.is_tripped(cid):
+                # 故障域熔断：代理挂时整组短路，不发网络请求，其余代理渠道一并跳过
+                failures.append({"channel": cid, "outcome": "proxy_blocked",
+                                 "detail": "fault domain tripped"})
+                errors.append(cid + ": proxy_blocked（故障域熔断）")
+                log_entry["errors"] = list(errors)
+                log_entry["failures"] = list(failures)
+                continue
+            resp = channels.chat_completion(cid, p2, route_info=dict(log_entry))
+            used_key = getattr(resp, '_key', '')  # P0-2：保存实际使用的 key，避免后续 reassign 丢失
+            if not p2.get("stream"):
+                # 非流式：读入内存并做空壳检测（如 modelscope 返回 200+choices:null），
+                # 壳响应视为该渠道失败，继续尝试下一渠道
+                ctype = resp.getheader("Content-Type", "application/json") or "application/json"
+                raw = resp.read()
+                # 思考后正文被上游安全过滤（finish_reason=content_filter 且无正文）→ 视为该渠道失败
+                if _has_content_filter_only(raw):
+                    failures.append({"channel": cid,
+                                     "outcome": upstream_outcome.Outcome.CONTENT_FILTER.value,
+                                     "detail": "思考后正文被上游安全过滤"})
+                    errors.append(cid + ": content_filter（思考后正文被过滤）")
+                    log_entry["errors"] = list(errors)
+                    log_entry["failures"] = list(failures)
+                    continue
+                outcome = upstream_outcome.classify_shell(raw)
+                if outcome != upstream_outcome.Outcome.SUCCESS:
+                    # 归一化失败：breaker 类型熔断（合成 429），非 breaker 只记录不惩罚
+                    if upstream_outcome.is_breaker(outcome):
+                        channels.mark_shell_failure(cid, real_model, used_key)
+                    failures.append({"channel": cid, "outcome": outcome.value,
+                                     "detail": "空壳/错误载荷"})
+                    errors.append(cid + ": " + outcome.value + "（空壳/错误载荷）")
+                    log_entry["errors"] = list(errors)
+                    log_entry["failures"] = list(failures)
+                    continue
+                resp = _BufferedResponse(raw, ctype)
+                # 验证通过后记录成功（P0-1：延迟到 shell 检测后，避免 200 提前清零 consec429）
+                channels.record_channel_success(cid, real_model, used_key)
+                fault_domains.mark_success(cid)
+            else:
+                # 流式：缓冲至决策——正文首 delta/正常收尾 → 提交回放；只有思考就被上游安全过滤
+                # （finish_reason=content_filter 且无正文）→ 视为渠道失败换下一渠道
+                decision, head, ooc = _peek_stream_decision(resp)
+                if decision != "commit":
+                    if decision == "content_filter":
+                        ooc = upstream_outcome.Outcome.CONTENT_FILTER
+                    if upstream_outcome.is_breaker(ooc):
+                        channels.mark_shell_failure(cid, real_model, used_key)
+                    failures.append({"channel": cid, "outcome": ooc.value,
+                                     "detail": "思考后正文被上游安全过滤"
+                                     if decision == "content_filter" else "流式首包为空壳/错误事件"})
+                    errors.append(cid + ": " + ooc.value + "（" +
+                                  ("思考后正文被过滤" if decision == "content_filter"
+                                   else "流式首包空壳/错误") + "）")
+                    log_entry["errors"] = list(errors)
+                    log_entry["failures"] = list(failures)
+                    try:
+                        resp.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    continue
+                resp = _PrependResponse(head, resp)
+                # 验证通过后记录成功（P0-1：延迟到决策后，避免 200 提前清零 consec429）
+                channels.record_channel_success(cid, real_model, used_key)
+            fault_domains.mark_success(cid)
+            _log_route(log_entry)
+            return cid, resp, log_entry
+        except urllib.error.HTTPError as he:
+            detail = he.read().decode("utf-8", "ignore")[:200]
+            outcome = upstream_outcome.classify_http_status(he.code, detail)
+            if upstream_outcome.is_breaker(outcome) and he.code != 429:
+                # 非 429 的 breaker（401/403/503 等）也触发熔断，避免反复撞死渠道
+                channels.mark_shell_failure(cid, real_model, channels.get_key(cid))
+            failures.append({"channel": cid, "outcome": outcome.value,
+                             "detail": "HTTP " + str(he.code)})
+            errors.append(cid + ": HTTP " + str(he.code) + " [" + outcome.value + "] " + detail)
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+        except RateLimitSkip as rle:
+            # 95% 提前切换（task_045）：该渠道配额桶满/熔断，走用户顺序里的下一渠道
+            failures.append({"channel": cid, "outcome": upstream_outcome.Outcome.RATE_LIMIT.value,
+                             "detail": str(rle)})
+            errors.append(cid + ": " + str(rle))
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+        except Exception as e:  # noqa: BLE001
+            outcome = upstream_outcome.classify_exception(e)
+            # 故障域：代理渠道传输/超时失败（连接拒绝/重置等）→ 整域计数，防反复重打死代理
+            if outcome == upstream_outcome.Outcome.TIMEOUT and fault_domains.proxy_for(cid):
+                fault_domains.mark_failure(cid)
+            failures.append({"channel": cid, "outcome": outcome.value,
+                             "detail": str(e)[:120]})
+            errors.append(cid + ": " + outcome.value + " " + str(e)[:120])
+            log_entry["errors"] = list(errors)
+            log_entry["failures"] = list(failures)
+
+    log_entry["errors"] = errors
+    log_entry["failures"] = failures
+    _log_route(log_entry)
+    return None, errors, log_entry
+
+
+def build_route_plan(model, payload=None):
+    """路由决策可观测接口（Phase 1 + PR#2 capability）：返回候选链 + 每个候选的 eligibility 原因。
+    只读，不预占配额、不触发上游请求。排障时不用猜"为什么没走第二家"。
+    payload 提供时按请求硬能力验算 capability_mismatch（与 route_completion 同一判定）。"""
+    payload = payload or {"model": model}
+    providers = channels.model_providers(model)
+    if providers:
+        chain = [(p["id"], (p.get("matched_models") or [model])[0]) for p in providers]
+    else:
+        chain = [(cid, model) for cid in channels.model_to_chain(model)]
+    if not chain:
+        chain = [(cid, channels.CHANNELS[cid].get("default_model", model))
+                 for cid in channels.DEFAULT_CHAIN if channels.get_channel_enabled(cid)]
+
+    health = channels.cached_health_all()
+    ledger = _rate_ledger() if _rate_ledger else {}
+
+    candidates = []
+    for cid, real_model in chain:
+        st = health.get(cid, {})
+        row = ledger.get(cid, {})
+        entry = {
+            "channel": cid,
+            "model": real_model,
+            "enabled": st.get("enabled", True),
+            "key_set": st.get("key_set", False),
+            "reachable": st.get("reachable", False),
+            "eligible": True,
+            "reason": None,
+            "used_1m": row.get("used_1m"),
+            "limit_1m": row.get("limit_rpm"),
+            "state": row.get("state", "open"),
+            "blocked_in": row.get("blocked_in"),
+        }
+        cap = capabilities.check_candidate(cid, real_model, payload)
+        entry["capability_mismatch"] = {"required": cap["required"],
+                                         "unsupported": cap["mismatch"],
+                                         "unknown": cap["unknown"],
+                                         "source": cap["source"]}
+        rb = _resource_block(cid, model, real_model)
+        entry["resource_block"] = ({"reason": rb[0], "resource_id": rb[1]} if rb else None)
+        if not st.get("enabled", True):
+            entry["eligible"], entry["reason"] = False, "disabled"
+        elif not st.get("key_set", False):
+            entry["eligible"], entry["reason"] = False, "no_key"
+        elif not st.get("reachable", False):
+            entry["eligible"], entry["reason"] = False, "unreachable"
+        elif rb is not None:
+            entry["eligible"], entry["reason"] = False, rb[0]
+        elif cap["mismatch"]:
+            entry["eligible"], entry["reason"] = False, "capability_mismatch"
+        elif row.get("state") == "blocked":
+            entry["eligible"], entry["reason"] = False, "blocked"
+        elif row.get("state") == "throttled":
+            entry["eligible"], entry["reason"] = False, "quota"
+        candidates.append(entry)
+    return {"model": model, "required_capabilities": sorted(capabilities.required_capabilities(payload)),
+            "candidates": candidates}
+
+
+def aggregate_models(only_selected=False, gatekeep=False):
+    """聚合所有渠道可用模型（OpenAI 格式）。
+    only_selected=True：只返回已选模型（客户端「获取模型」用，避免一次拉到 500+ 全量）。
+    gatekeep=True：斩杀线模式——已选 ∪ 免费主流旗舰（dots3-note-prev 为线，未选弱模型斩杀隐藏）。
+    前端 /api/models 仍全量（策展用）。统一走 channels.all_models()：自定义模型别名会加入、
+    隐藏模型会被剔除，与前端 /api/models 单一真源一致。owned_by = 支持渠道 id 列表。"""
+    return [{"id": m["name"], "object": "model",
+             "owned_by": ",".join(p["id"] for p in m["providers"])}
+            for m in channels.all_models(only_selected=only_selected, gatekeep=gatekeep)]
+
+
+# 上游 content_filter 归一化（2026-08-29 修复）：DeepSeek Harness 等 OpenAI 客户端
+# 把 finish_reason=content_filter 判为硬错误（PI_AI_ERROR）导致运行失败；硅基/部分
+# 免费渠道在安全过滤时返回它。改写为 stop：客户端视为正常结束（保留已生成内容）。
+# 注：改写为 length 会显示"已达输出 token 上限"误导提示（finish_reason=length 映射为 max-tokens），
+# 2026-08-29 改回 stop 消除该提示。
+_CF_PATTERN = b'"finish_reason":"content_filter"'
+_CF_REPLACEMENT = b'"finish_reason":"stop"'
+
+
+def _normalize_content_filter(data: bytes) -> bytes:
+    if _CF_PATTERN not in data:
+        return data
+    print(f"[gateway] finish_reason content_filter → stop 归一化 ({time.strftime('%H:%M:%S')})",
+          file=sys.stderr)
+    return data.replace(_CF_PATTERN, _CF_REPLACEMENT)
+
+
+def _del_reasoning_keys(obj):
+    """递归删除 dict 里的 reasoning_content（思考内容）。
+    统一剥离（2026-08-30 用户拍板）：DeepSeek V4 Pro/Flash、GLM 5.x 等 thinking 模型的
+    reasoning_content 逐 token 流式，客户端当作正文显示 → 输出断续蹦字。剥离后只透传正文。"""
+    if isinstance(obj, dict):
+        obj.pop("reasoning_content", None)
+        for v in obj.values():
+            _del_reasoning_keys(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            _del_reasoning_keys(v)
+
+
+def _strip_reasoning_json(raw):
+    """非流式：JSON 响应剥离 reasoning_content。解析失败原样返回，不阻断转发。"""
+    try:
+        obj = json.loads(raw)
+        _del_reasoning_keys(obj)
+        return json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    except Exception:  # noqa: BLE001
+        return raw
+
+
+class _SseReasoningStripper:
+    """流式：按 SSE 行切分，对完整 data JSON 剥离 reasoning_content。
+    跨 chunk 残片缓存在 buf，行尾补齐再处理；非 data 行（[DONE]/注释/空行）原样透传。
+    \r\n 归一为 \n 后再切，避免 CR 残留导致 JSON 解析失败。"""
+
+    def __init__(self):
+        self.buf = b""
+
+    def feed(self, data, final=False):
+        self.buf += data
+        text = self.buf.replace(b"\r\n", b"\n")
+        lines = text.split(b"\n")
+        if not final and text and not text.endswith(b"\n"):
+            self.buf = lines.pop()
+        else:
+            self.buf = b""
+        # SSE 事件重定界（2026-08-30）：小红书/dots3 等上游存在事件间只隔单个 \n 的不规范流，
+        # pi-ai 按 \n\n 切分会把两条 data: 拼成一个消息 → JSON.parse 失败
+        # （"Unexpected non-whitespace character after JSON at position 210"）。
+        # 对每条完整 data: 行强制以 \n\n 收尾，把事件边界归一化；空行不透传（边界由本层统一补）。
+        out = bytearray()
+        for ln in lines:
+            ln = self._strip_line(ln)
+            if ln.startswith(b"data:"):
+                out += ln + b"\n\n"
+            elif ln:
+                out += ln + b"\n"
+        return bytes(out)
+
+    def _strip_line(self, line):
+        if not line.startswith(b"data:"):
+            return line
+        payload = line[5:].strip()
+        if not payload.startswith(b"{"):
+            return line
+        try:
+            obj = json.loads(payload)
+            _del_reasoning_keys(obj)
+            return b"data: " + json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        except Exception:  # noqa: BLE001
+            return line
+
+
+def stream_openai_passthrough(handler, upstream):
+    """把上游 SSE 流原样转发给客户端。收到 [DONE] 即结束（防上游 keep-alive 挂起）；
+    上游中途断开（未见 [DONE]）时补发 error 事件 + [DONE]，避免客户端无声截断。
+
+    commit point invariant（Phase 1）：failover 只允许发生在 response commit 前——
+    首包验证（_peek_stream）通过即 commit，此后不得换上游继续输出，否则两个模型的
+    输出会拼在同一条 assistant response 里。中途断流只能结束本响应、由客户端重试。"""
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "close")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.end_headers()
+    tail = b""
+    # 归一化 content_filter：carry 保留可能与 pattern 尾部重叠的字节，避免从中间劈开
+    carry = b""
+    # 剥离 reasoning_content（thinking 逐字蹦字 → 只透传正文）
+    stripper = _SseReasoningStripper()
+    done = False
+    while True:
+        try:
+            chunk = upstream.read(2048)
+        except Exception:  # noqa: BLE001
+            break
+        if not chunk:
+            break
+        buf = carry + chunk
+        keep = max(0, len(buf) - len(_CF_PATTERN) + 1)
+        head, carry = buf[:keep], buf[keep:]
+        out = _normalize_content_filter(head)
+        if out:
+            try:
+                handler.wfile.write(stripper.feed(out))
+                handler.wfile.flush()
+            except Exception:  # noqa: BLE001
+                # 客户端提前断开：退出前兜底记账，否则这次调用永远不进用量
+                break
+        tail = (tail + chunk)[-8192:]
+        if b"[DONE]" in tail:
+            done = True
+            break
+    if carry:
+        out = _normalize_content_filter(carry)
+        if out:
+            try:
+                handler.wfile.write(stripper.feed(out, final=True))
+                handler.wfile.flush()
+            except Exception:  # noqa: BLE001
+                pass
+    # 兜底记账（幂等）：正常 EOF 已由 read() 记过；中断路径在这里补记
+    f = getattr(upstream, "force_finalize", None)
+    if f:
+        try:
+            f()
+        except Exception:  # noqa: BLE001
+            pass
+    if not done:
+        try:
+            handler.wfile.write(b'data: {"error": {"message": "upstream stream interrupted", "type": "upstream_error"}}\n\n')
+            handler.wfile.write(b"data: [DONE]\n\n")
+            handler.wfile.flush()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class GatewayHandler(http.server.BaseHTTPRequestHandler):
+    server_version = "API-Gateway/1.0"
+
+    def _send(self, status, content_type, body: bytes, extra_headers=None):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_json(self, status, obj):
+        self._send(status, "application/json; charset=utf-8", json.dumps(obj, ensure_ascii=False).encode("utf-8"))
+
+    def _require_auth(self, path):
+        """网关 API key 守卫：未配置 key（旧行为）或路径豁免 → 放行；
+        已配置 key → 要求 Authorization: Bearer <key>，不符回 401。"""
+        if not _needs_auth(path):
+            return True
+        key = get_api_key()
+        if not key:
+            return True
+        if (self.headers.get("Authorization") or "") == "Bearer " + key:
+            return True
+        self._send_json(401, {"error": {"message": "未授权：此网关已启用 API key，"
+                                        "请在请求头携带 Authorization: Bearer <key>",
+                                        "type": "unauthorized"}})
+        return False
+
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
+
+    def do_PUT(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if not self._require_auth(path):
+            return
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        body = self.rfile.read(length) if length else b""
+        if path == "/api/gateway-key":
+            # 设置/变更/关闭网关 API key。已启用 key 时本接口同样受守卫保护（须持旧 key）；
+            # 未启用时允许直接设置（首次引导）。key 传空串 = 关闭鉴权。
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            key = data.get("key")
+            if key is None or not isinstance(key, str):
+                self._send_json(400, {"error": "key 必填（字符串；空串 = 关闭鉴权）"})
+                return
+            key = key.strip()
+            if key and not (8 <= len(key) <= 128):
+                self._send_json(400, {"error": "key 长度须为 8–128 字符（或传空串关闭）"})
+                return
+            save_api_key(key)
+            self._send_json(200, {"status": "ok", "auth_required": bool(key)})
+            return
+        if path == "/api/routing":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            model = (data.get("model") or "").strip()
+            if not model:
+                self._send_json(400, {"error": "model 必填"})
+                return
+            order = data.get("order", [])
+            disabled = data.get("disabled", [])
+            if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+                self._send_json(400, {"error": "order 必须是字符串数组"})
+                return
+            if not isinstance(disabled, list) or not all(isinstance(x, str) for x in disabled):
+                self._send_json(400, {"error": "disabled 必须是字符串数组"})
+                return
+            unknown = [c for c in order + disabled if c not in channels.CHANNELS]
+            if unknown:
+                self._send_json(400, {"error": "未知渠道: " + ", ".join(unknown)})
+                return
+            # order 与 disabled 均空 → 清除规则（避免存无意义空规则）
+            if not order and not disabled:
+                channels.save_routing(model, None)
+            else:
+                channels.save_routing(model, order, disabled)
+            self._send_json(200, {"status": "ok", "model": model,
+                                  "effective_order": channels.effective_order(model)})
+            return
+        if path.startswith("/api/channels/") and path.endswith("/enabled"):
+            cid = path[len("/api/channels/"):-len("/enabled")]
+            if cid not in channels.CHANNELS:
+                self._send_json(400, {"error": "未知渠道: " + cid})
+                return
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            enabled = bool(data.get("enabled", True))
+            channels.set_channel_enabled(cid, enabled)
+            channels.invalidate_channel_cache(cid)
+            trigger_cherry_sync()
+            self._send_json(200, {"channel": cid, "enabled": enabled})
+            return
+        if path.startswith("/api/channels/") and path.endswith("/hidden"):
+            cid = path[len("/api/channels/"):-len("/hidden")]
+            if cid not in channels.CHANNELS:
+                self._send_json(400, {"error": "未知渠道: " + cid})
+                return
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            hidden = bool(data.get("hidden", True))
+            channels.set_hidden_channel(cid, hidden)
+            trigger_cherry_sync()
+            self._send_json(200, {"channel": cid, "hidden": hidden})
+            return
+        if path.startswith("/api/channels/") and path.endswith("/models"):
+            cid = path[len("/api/channels/"):-len("/models")]
+            if cid not in channels.CHANNELS:
+                self._send_json(404, {"error": "未知渠道: " + cid})
+                return
+            try:
+                data = json.loads(body.decode("utf-8-sig") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            sel = data.get("selected")
+            if not isinstance(sel, list) or not all(isinstance(x, str) for x in sel):
+                self._send_json(400, {"error": "selected 必须是字符串数组"})
+                return
+            clean = channels.set_channel_selection(cid, sel)
+            trigger_cherry_sync()
+            self._send_json(200, {"status": "ok", "channel": cid,
+                                  "selected": clean, "curated": bool(clean)})
+            return
+        if path == "/api/switch":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            if "enabled" not in data:
+                self._send_json(400, {"error": "enabled 必填"})
+                return
+            save_state(bool(data["enabled"]))
+            self._send_json(200, {"enabled": is_enabled()})
+            return
+        if path == "/api/model-overrides/hidden":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            hidden = data.get("hidden", [])
+            if not isinstance(hidden, list) or not all(isinstance(x, str) for x in hidden):
+                self._send_json(400, {"error": "hidden 必须是字符串数组"})
+                return
+            channels.set_hidden_models(hidden)
+            self._send_json(200, {"status": "ok", "hidden": channels.load_model_overrides().get("hidden") or []})
+            return
+        if path == "/api/expiry":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            # 合并写入：保留原有不在本次提交中的字段
+            existing = load_expiry()
+            existing.update(data)
+            save_expiry(existing)
+            self._send_json(200, {"status": "ok", "expiry": load_expiry()})
+            return
+        self._send_json(404, {"error": "not found"})
+
+    def _handle_images(self, payload):
+        """生图转发：/v1/images/generations。模型→渠道路由：
+        seedream/seededit → ark（火山方舟）；sensenova-u1* → sensetime（商汤日日新）。"""
+        model = (payload.get("model") or "").strip()
+        if not model:
+            self._send_json(400, {"error": "model 必填"})
+            return
+        m = model.lower()
+        if "seedream" in m or "seededit" in m:
+            cid = "ark"
+        elif m.startswith("sensenova-u1"):
+            cid = "sensetime"
+        else:
+            self._send_json(400, {"error": "未支持的生图模型: " + model +
+                                          "（当前支持 seedream*/seededit*→ark，sensenova-u1*→sensetime）"})
+            return
+        key = channels.get_key(cid)
+        if not key:
+            self._send_json(400, {"error": "渠道 " + cid + " 未配置 key"})
+            return
+        url = channels.CHANNELS[cid]["base_url"].rstrip("/") + "/images/generations"
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Bearer " + key,
+                     "User-Agent": channels.CHANNELS[cid].get("ua", "unified-ai-gateway/1.0")},
+            method="POST")
+        try:
+            resp = urllib.request.urlopen(req, timeout=300)
+            raw = resp.read()
+            self.send_response(resp.status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("X-Resolved-Channel", cid)
+            self.send_header("X-Resolved-Model", model)
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            try:
+                quota.record_call("api_gateway", cid, model, 0, 0, True)
+            except Exception:  # noqa: BLE001
+                pass
+        except urllib.error.HTTPError as he:
+            try:
+                body = json.loads(he.read().decode("utf-8", "ignore") or "{}")
+            except Exception:  # noqa: BLE001
+                body = {"error": {"message": "upstream HTTP " + str(he.code)}}
+            self._send_json(he.code, body)
+        except Exception as e:  # noqa: BLE001
+            self._send_json(502, {"error": str(e)[:200]})
+
+    def do_DELETE(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
+        if not self._require_auth(path):
+            return
+        if path.startswith("/api/channels/") and path.count("/") == 3:
+            cid = path[len("/api/channels/"):]
+            ok = channels.delete_custom_channel(cid)
+            if not ok:
+                self._send_json(400, {"error": "只能删除自定义渠道（内置渠道不可删）: " + cid})
+                return
+            self._send_json(200, {"status": "deleted", "channel": cid})
+            return
+        if path == "/api/routing":
+            model = (query.get("model", [""])[0] or "").strip()
+            if not model:
+                self._send_json(400, {"error": "model 必填"})
+                return
+            channels.save_routing(model, None)
+            self._send_json(200, {"status": "cleared", "model": model,
+                                  "effective_order": channels.effective_order(model)})
+            return
+        if path == "/api/model-overrides/custom":
+            name = (query.get("name", [""])[0] or "").strip()
+            if not name:
+                self._send_json(400, {"error": "name 必填"})
+                return
+            channels.remove_custom_model(name)
+            self._send_json(200, {"status": "removed", "name": name})
+            return
+        if path == "/api/unified":
+            name = (query.get("name", [""])[0] or "").strip()
+            if not name:
+                self._send_json(400, {"error": "name 必填"})
+                return
+            channels.delete_unified_model(name)
+            # 顺手清掉该模型的编排规则，避免残留孤儿规则
+            channels.save_routing(channels.normalize_model_name(name), None)
+            self._send_json(200, {"status": "removed", "name": channels.normalize_model_name(name)})
+            return
+        self._send_json(404, {"error": "not found"})
+
+    def do_GET(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
+        if not self._require_auth(path):
+            return
+        if path in ("/", "/index.html"):
+            self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/dispatch":
+            self._send(200, "text/html; charset=utf-8",
+                       _read_page("dispatch.html").encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/dispatch/live":
+            # 派发中心三级页：任务执行过程实时观测（免鉴权只读）
+            self._send(200, "text/html; charset=utf-8",
+                       _read_page("dispatch_live.html").encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/speed":
+            # 每日渠道测速可视化页（免鉴权只读）
+            self._send(200, "text/html; charset=utf-8",
+                       _read_page("speed.html").encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/api_page.html":
+            # 控制台页面本体（HTML 骨架，无数据；数据接口仍走鉴权）
+            self._send(200, "text/html; charset=utf-8", _read_page().encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/api/speed/test":
+            # 每日测速数据：当日快照 + 近 7 天趋势（免鉴权只读，无配置无密钥）
+            self._send_json(200, _speed_test_data())
+        elif path == "/api/dispatch/live/list":
+            self._send_json(200, dispatch_live_list())
+        elif path.startswith("/api/dispatch/live/"):
+            task_id = path[len("/api/dispatch/live/"):]
+            if not re.fullmatch(r"[0-9a-zA-Z_-]{1,64}", task_id):
+                self._send_json(400, {"error": "非法 task_id"})
+                return
+            events = dispatch_live_events(task_id)
+            if events is None:
+                self._send_json(404, {"error": "task 不存在: " + task_id})
+                return
+            self._send_json(200, {"task_id": task_id, "events": events})
+        elif path == "/api/dispatch/status":
+            self._send_json(200, dispatch_status())
+        elif path == "/healthz":
+            self._send_json(200, {"ok": True})
+        elif path == "/api/resource-config/status":
+            # P4.2：资源配置热加载状态（发布方 ACK 轮询 + 排障用，免鉴权只读）
+            self._send_json(200, _resource_status())
+        elif path == "/api/health":
+            self._send_json(200, {"llm": channels.cached_health_all(),
+                                  "hidden": channels.hidden_channels_meta(),
+                                  "time": time_str()})
+        elif path == "/api/channels":
+            self._send_json(200, {"channels": channels.cached_health_all()})
+        elif path.startswith("/api/channels/") and path.endswith("/models"):
+            cid = path[len("/api/channels/"):-len("/models")]
+            if cid not in channels.CHANNELS:
+                self._send_json(404, {"error": "未知渠道: " + cid})
+                return
+            ch = channels.CHANNELS.get(cid, {})
+            st = channels.cached_health_all().get(cid, {})
+            catalog = sorted(st.get("models") or [])
+            sel = channels.get_channel_selection(cid) or []
+            sset = set(sel)
+            self._send_json(200, {
+                "channel": cid,
+                "name": ch.get("name", cid),
+                "icon": ch.get("icon", "🤖"),
+                "billing_tag": ch.get("billing_tag", ""),
+                "enabled": st.get("enabled", True),
+                "reachable": st.get("reachable", False),
+                "selected": sel,
+                "all": catalog,
+                "unselected": [m for m in catalog if m not in sset],
+            })
+        elif path == "/v1/models":
+            # 斩杀线模式：已选 ∪ 免费主流旗舰（dots3-note-prev 为线，弱免费模型斩杀隐藏）
+            self._send_json(200, {"object": "list", "data": aggregate_models(gatekeep=True)})
+        elif path == "/api/models":
+            self._send_json(200, {"models": channels.all_models()})
+        elif path == "/api/model_providers":
+            model = query.get("model", [""])[0]
+            full = query.get("full", ["0"])[0] in ("1", "true", "yes")
+            self._send_json(200, {"model": model, "providers": channels.model_providers(model, full=full)})
+        elif path == "/api/route-plan":
+            model = query.get("model", [""])[0]
+            payload_q = query.get("payload", [None])[0]
+            payload = None
+            if payload_q:
+                try:
+                    payload = json.loads(urllib.parse.unquote(payload_q))
+                except Exception:  # noqa: BLE001
+                    payload = None
+            self._send_json(200, build_route_plan(model, payload=payload))
+        elif path == "/api/routing":
+            self._send_json(200, {"routing": channels.load_routing().get("routing", {})})
+        elif path == "/api/switch":
+            self._send_json(200, {"enabled": is_enabled()})
+        elif path == "/api/channel-notes":
+            self._send_json(200, channels.load_channel_notes())
+        elif path == "/api/model-rank":
+            self._send_json(200, channels.load_model_rank())
+        elif path == "/api/model-overrides":
+            ov = channels.load_model_overrides()
+            self._send_json(200, {"custom": ov.get("custom") or [],
+                                  "hidden": ov.get("hidden") or []})
+        elif path == "/api/unified":
+            self._send_json(200, {"unified": channels.load_unified()})
+        elif path == "/api/unified/suggest":
+            q = query.get("q", [""])[0]
+            self._send_json(200, {"q": q, "suggest": channels.unified_suggest(q)})
+        elif path == "/api/usage":
+            if _get_usage is None:
+                self._send_json(503, {"error": "quota 模块不可用"})
+            else:
+                self._send_json(200, usage_summary())
+        elif path == "/api/rate-limits":
+            # 渠道限流准入台账（task_045 v2）：调研上限 + 实测 + 状态机 + 翻转事件
+            if _rate_ledger is None:
+                self._send_json(503, {"error": "rate_limit 模块不可用"})
+            else:
+                self._send_json(200, {"channels": _rate_ledger(),
+                                      "events": (_rate_events() or []) if _rate_events else []})
+        elif path == "/api/expiry":
+            self._send_json(200, load_expiry())
+        elif path == "/api/gateway-info":
+            self._send_json(200, gateway_info())
+        elif path.startswith("/img/"):
+            _serve_img(self, path)
+        elif path == "/api/route-log":
+            # 内存（最新）+ 落盘（重启前历史）合并：落盘尾部通常含内存，取更早部分补足。
+            with _ROUTE_LOG_LOCK:
+                mem = list(_ROUTE_LOG)
+            disk = _read_route_log_file(_ROUTE_LOG_MAX)
+            if len(mem) >= _ROUTE_LOG_MAX:
+                merged = mem
+            else:
+                merged = disk[:_ROUTE_LOG_MAX - len(mem)] + mem
+            self._send_json(200, {"log": merged})
+        elif path == "/api/gateway-catalog":
+            # 三拆配置只读汇总（catalog/routes/registry + counts），供外部 AI 与调试读取。
+            self._send_json(200, catalog_routes.summary())
+        elif path == "/v1/sse":
+            model = query.get("model", [""])[0]
+            prompt = query.get("prompt", [""])[0]
+            payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "stream": True}
+            self._handle_chat(payload)
+        else:
+            self._send_json(404, {"error": "not found"})
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if not self._require_auth(path):
+            return
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        body = self.rfile.read(length) if length else b""
+        if path == "/api/route-plan":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception as e:  # noqa: BLE001
+                self._send_json(400, {"error": "invalid JSON: " + str(e)[:100]})
+                return
+            self._send_json(200, build_route_plan(data.get("model", ""), payload=data))
+            return
+        if path.startswith("/api/channels/") and path.endswith("/key"):
+            cid = path[len("/api/channels/"):-len("/key")]
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+                key = data.get("key", "")
+                if key:
+                    channels.save_channel_key(cid, key)
+                    trigger_cherry_sync()
+                    self._send_json(200, {"status": "ok", "channel": cid})
+                else:
+                    self._send_json(400, {"error": "key 必填"})
+            except Exception as e:  # noqa: BLE001
+                self._send_json(500, {"error": str(e)[:120]})
+            return
+        if path.startswith("/api/channels/") and path.endswith("/test"):
+            cid = path[len("/api/channels/"):-len("/test")]
+            if cid in channels.NO_TEST_CHANNELS:
+                self._send_json(200, {"channel": cid, "reachable": True, "error": "禁测（贵）· 不发起测试", "no_test": True})
+                return
+            key = channels.get_key(cid)
+            if not key:
+                self._send_json(200, {"channel": cid, "reachable": False, "error": "未配置 key"})
+                return
+            try:
+                st = channels.channel_health(cid)
+                self._send_json(200, {"channel": cid, "reachable": st.get("reachable", False), "error": st.get("error", "")})
+            except Exception as e:  # noqa: BLE001
+                self._send_json(200, {"channel": cid, "reachable": False, "error": str(e)[:120]})
+            return
+        if path == "/api/model-overrides/custom":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            name = (data.get("name") or "").strip()
+            cid = (data.get("channel") or "").strip()
+            model = (data.get("model") or "").strip()
+            if not name or not model:
+                self._send_json(400, {"error": "name 与 model 必填"})
+                return
+            if cid not in channels.CHANNELS:
+                self._send_json(400, {"error": "未知渠道: " + cid})
+                return
+            if not channels.key_is_set(cid):
+                self._send_json(400, {"error": "该渠道未配置 key，请先到渠道管理配置"})
+                return
+            channels.add_custom_model(name, cid, model)
+            self._send_json(200, {"status": "ok", "name": name, "channel": cid, "model": model})
+            return
+        if path in ("/v1/chat/completions", "/chat/completions"):
+            try:
+                self._handle_chat(json.loads(body.decode("utf-8-sig") or "{}"))
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+            return
+        if path in ("/v1/images/generations", "/images/generations"):
+            try:
+                self._handle_images(json.loads(body.decode("utf-8-sig") or "{}"))
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+            return
+        if path == "/api/unified":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            name = (data.get("name") or "").strip()
+            members = data.get("members")
+            display = (data.get("display") or "").strip() or None
+            if not name:
+                self._send_json(400, {"error": "name 必填"})
+                return
+            if not isinstance(members, dict) or not all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in members.items()):
+                self._send_json(400, {"error": "members 必须是 {渠道id: 上游模型名} 对象"})
+                return
+            unknown = [c for c in members if c not in channels.CHANNELS]
+            if unknown:
+                self._send_json(400, {"error": "未知渠道: " + ", ".join(unknown)})
+                return
+            try:
+                entry = channels.set_unified_model(name, members, display)
+            except ValueError as e:
+                self._send_json(400, {"error": str(e)})
+                return
+            self._send_json(200, {"status": "ok", "name": channels.normalize_model_name(name),
+                                  "entry": entry})
+            return
+        if path == "/api/channels":
+            # 新增自定义渠道：写 channels.json custom_channels，免改代码、免重启
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            cid = (data.get("id") or "").strip().lower()
+            base = (data.get("base_url") or "").strip().rstrip("/")
+            name = (data.get("name") or "").strip() or cid
+            billing_type = data.get("billing_type") or "free"
+            if not cid or not base:
+                self._send_json(400, {"error": "id 与 base_url 必填"})
+                return
+            if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", cid):
+                self._send_json(400, {"error": "id 只能用小写字母/数字/点/杠/下划线，且以字母或数字开头"})
+                return
+            if cid in channels.CHANNELS:
+                self._send_json(400, {"error": "渠道 id 已存在: " + cid})
+                return
+            models = data.get("models")
+            if models is not None and (not isinstance(models, list) or not all(isinstance(m, str) for m in models)):
+                self._send_json(400, {"error": "models 必须是字符串数组"})
+                return
+            definition = {
+                "name": name,
+                "provider": (data.get("provider") or "").strip() or name,
+                "billing_type": billing_type,
+                "billing_tag": (data.get("billing_tag") or "").strip()
+                               or ("🟢 免费" if billing_type != "paid" else "🔴 付费扣费"),
+                "icon": (data.get("icon") or "🤖").strip()[:8],
+                "base_url": base,
+                "env_key": (data.get("env_key") or "").strip(),
+                "proxy": (data.get("proxy") or "").strip(),
+                "free": billing_type != "paid",
+                "speed": data.get("speed") or "medium",
+                "default_model": (data.get("default_model") or "").strip(),
+                "models": models if models is not None else [],
+                "note": (data.get("note") or "").strip(),
+            }
+            mp = (data.get("models_path") or "").strip()
+            if mp:
+                definition["models_path"] = mp
+            channels.save_custom_channel(cid, definition)
+            key = (data.get("key") or "").strip()
+            if key:
+                channels.save_channel_key(cid, key)
+            trigger_cherry_sync()
+            self._send_json(200, {"status": "ok", "channel": cid})
+            return
+        if path == "/api/sync-cherry":
+            # 手动触发 网关→Cherry Studio 同步（渠道页「同步到 Cherry」按钮）
+            if _sync_cherry is None:
+                self._send_json(500, {"error": "sync_cherry 模块不可用"})
+                return
+            try:
+                res = _sync_cherry.run_sync(dry=False)
+                self._send_json(200, {
+                    "status": "ok",
+                    "providers": len(res["providers"]),
+                    "models": len(res["models"]),
+                    "providers_detail": [
+                        {"channel": cid, "provider": pid, "name": name, "enabled": en}
+                        for cid, pid, name, en in res["providers"]
+                    ],
+                })
+            except Exception as e:  # noqa: BLE001
+                self._send_json(500, {"error": str(e)[:200]})
+            return
+        self._send_json(404, {"error": "not found"})
+
+    def _handle_chat(self, payload):
+        if not is_enabled():
+            self._send_json(503, {"error": {"message": "API 转发网关已暂停（总开关关闭）",
+                                            "type": "gateway_paused"}})
+            return
+        is_stream = bool(payload.get("stream"))
+        cid, result, log_entry = route_completion(payload)
+        if cid is None:
+            self._send_json(502, {"error": {"message": "所有渠道均不可用：" + " | ".join(result),
+                                            "type": "upstream_error"}})
+            return
+        try:
+            ctype = result.getheader("Content-Type", "application/json")
+            if is_stream or "text/event-stream" in ctype:
+                stream_openai_passthrough(self, result)
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                # 路由透明头
+                ri = log_entry or {}
+                self.send_header("X-Routed-Channel", ri.get("resolved_channel", ""))
+                self.send_header("X-Resolved-Model", ri.get("resolved_model", ""))
+                self.send_header("X-Fallback-Count", str(ri.get("fallback_count", 0)))
+                self.end_headers()
+                self.wfile.write(_strip_reasoning_json(_normalize_content_filter(result.read())))
+        except Exception as e:  # noqa: BLE001
+            self._send_json(502, {"error": {"message": "转发失败: " + str(e), "type": "upstream_error"}})
+
+    def log_message(self, *args):  # noqa: D401
+        pass
+
+
+def _read_page(name="api_page.html"):
+    try:
+        with open(os.path.join(BASE_DIR, "web", name), "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:  # noqa: BLE001
+        return "<html><body><h2>" + name + " 缺失</h2></body></html>"
+
+
+def _speed_test_data():
+    """每日测速数据：当日快照 + 近 7 天趋势（从 history.jsonl 聚合 tok_s 均值）。
+    只读 speed_tests/ 目录，缺文件返回空结构不报错。"""
+    out_dir = os.path.join(channels.DATA_DIR, "speed_tests")
+    snap = {}
+    try:
+        day_path = os.path.join(out_dir, date.today().isoformat() + ".json")
+        with open(day_path, "r", encoding="utf-8") as f:
+            snap = json.load(f)
+    except Exception:  # noqa: BLE001
+        pass
+    # 近 7 天趋势：{model_pair: [{date, tok_s, ttft_s, ok}]}
+    trend = {}
+    cutoff = (date.today() - timedelta(days=7)).isoformat()
+    try:
+        with open(os.path.join(out_dir, "history.jsonl"), "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except Exception:  # noqa: BLE001
+                    continue
+                if (r.get("date") or "") < cutoff:
+                    continue
+                key = r.get("channel") + "|" + r.get("model")
+                trend.setdefault(key, []).append({
+                    "date": r.get("date"), "ok": r.get("ok"),
+                    "tok_s": r.get("tok_s"), "ttft_s": r.get("ttft_s"),
+                })
+    except Exception:  # noqa: BLE001
+        pass
+    return {"today": snap, "trend": trend}
+
+
+def _lan_ip():
+    """局域网出口 IP（UDP connect 不发包，只取路由源地址）。"""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:  # noqa: BLE001
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+def gateway_info():
+    """接入信息：本机/局域网地址与鉴权方式。key 永不回显，只报告是否启用。"""
+    need = bool(get_api_key())
+    return {"port": PORT,
+            "local_url": f"http://localhost:{PORT}",
+            "lan_url": f"http://{_lan_ip()}:{PORT}",
+            "chat_path": "/v1/chat/completions",
+            "models_path": "/v1/models",
+            "auth_required": need,
+            "auth_header": "Authorization: Bearer <你的网关 key>" if need else "",
+            "api_key": ""}
+
+
+_IMG_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+              ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml"}
+
+
+def _serve_img(self, path):
+    """web/img/ 静态图片（允许 styles/ brand/ 等子目录；normpath + 前缀校验防目录穿越）。"""
+    rel = urllib.parse.unquote(path[len("/img/"):]).replace("\\", "/").lstrip("/")
+    base = os.path.normpath(os.path.join(BASE_DIR, "web", "img"))
+    fp = os.path.normpath(os.path.join(base, rel))
+    if not fp.startswith(base + os.sep) or not os.path.isfile(fp):
+        self._send_json(404, {"error": "not found"})
+        return
+    ext = os.path.splitext(fp)[1].lower()
+    with open(fp, "rb") as f:
+        self._send(200, _IMG_TYPES.get(ext, "application/octet-stream"), f.read(),
+                   extra_headers={"Cache-Control": "max-age=3600"})
+
+
+def time_str():
+    import time
+    return time.strftime("%H:%M:%S")
+
+
+def dispatch_status():
+    """派发中心状态（/api/dispatch/status，免鉴权只读）：三级执行位探测 + 最近派发历史。
+
+    执行位探测均为只读本地检查：端口 / 进程 / 文件存在性，不触发任何远端请求。
+    """
+    import socket
+    import glob
+
+    def port_open(port):
+        try:
+            s = socket.create_connection(("127.0.0.1", port), timeout=1.0)
+            s.close()
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    # A 级：:3100 免费组（网关自身在跑即视为可用，模型名固定 deepseek-free/fast）
+    a_ok = port_open(PORT)
+
+    # B 级（6 个执行位，均为只读本地探测，不触发远端请求）：
+    #   trae=cursor-solo CDP 端口 · qoder=qoderclicn 模块 · cursor=cursor-agent ·
+    #   workbuddy=内嵌 codebuddy CLI · doubao=豆包 CDP 端口 · qoderwork=内嵌 qoderclicn.exe
+    b = {}
+    b["trae"] = port_open(9235)
+    b["qoder"] = bool(glob.glob(os.path.expandvars(
+        r"%APPDATA%\npm\node_modules\@qodercn-ai\qoderclicn\bundle\qoderclicn.js")))
+    b["cursor"] = bool(os.path.isdir(os.path.join(
+        os.environ.get("LOCALAPPDATA", ""), "cursor-agent", "versions")))
+    b["workbuddy"] = os.path.isfile(r"D:\workbuddy\resources\app.asar.unpacked\cli\bin\codebuddy")
+    b["doubao"] = port_open(9225)
+    b["qoderwork"] = os.path.isfile(r"D:\QoderCN\QoderWork CN\resources\bin\qoderclicn.exe")
+    _b_labels = {"trae": "连接", "qoder": "可用", "cursor": "已装", "workbuddy": "存在",
+                 "doubao": "连接", "qoderwork": "存在"}
+    b["detail"] = " · ".join("%s=%s" % (k, _b_labels[k] if v else "离线/缺失")
+                             for k, v in b.items() if k != "detail")
+
+    # C 级：opencli 桥接（:3080 是 opencli daemon/扩展桥监听端口）
+    c_ok = port_open(3080)
+
+    # modelscope 计划任务：查任务状态 + 最近一次日报
+    ms = {"ok": False, "last": ""}
+    try:
+        import subprocess as _sp
+        r = _sp.run(["powershell", "-NoProfile", "-Command",
+                     "Get-ScheduledTask -TaskName 'ModelScope每日魔粒守护' | Select-Object -ExpandProperty State"],
+                    capture_output=True, text=True, timeout=8)
+        ms["ok"] = ("Ready" in (r.stdout or ""))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        report = os.path.join(os.path.dirname(os.path.dirname(BASE_DIR)),
+                              "modelscope-daily", "logs", "魔粒日报.md")
+        if os.path.isfile(report):
+            with open(report, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("运行时间"):
+                        ms["last"] = line.replace("运行时间（北京时间）：", "").replace("运行时间：", "")
+                        break
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 最近派发历史（dispatch.py 落盘，位于 services/ 下）
+    history = []
+    hist_file = os.path.join(os.path.dirname(BASE_DIR), "dispatch_history.jsonl")
+    if os.path.isfile(hist_file):
+        try:
+            with open(hist_file, encoding="utf-8") as f:
+                lines = [ln for ln in f if ln.strip()]
+            for ln in lines[-50:]:
+                try:
+                    history.append(json.loads(ln))
+                except Exception:  # noqa: BLE001
+                    continue
+        except Exception:  # noqa: BLE001
+            pass
+    history.reverse()
+
+    return {
+        "time": time_str(),
+        "a": {"ok": a_ok, "detail": "free 组在线" if a_ok else "网关未运行"},
+        "b": b,
+        "c": {"ok": c_ok, "detail": "桥接正常" if c_ok else "桥接离线"},
+        "modelscope": ms,
+        "history": history,
+    }
+
+
+def dispatch_live_list():
+    """运行实况任务列表（/api/dispatch/live/list，免鉴权只读）。
+    扫描 services/dispatch_live/*.jsonl：首行取 start 元数据（ts/tier/via/prompt），
+    末行是否 done 事件判定 running/done。按 start_ts 倒序。"""
+    tasks = []
+    try:
+        names = os.listdir(DISPATCH_LIVE_DIR)
+    except Exception:  # noqa: BLE001  目录不存在 = 尚无运行实况
+        names = []
+    for name in names:
+        if not name.endswith(".jsonl"):
+            continue
+        tid = name[:-len(".jsonl")]
+        fp = os.path.join(DISPATCH_LIVE_DIR, name)
+        first = last = None
+        stream_bytes = stream_count = 0
+        try:
+            with open(fp, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:  # noqa: BLE001  坏行跳过
+                        continue
+                    if first is None:
+                        first = obj
+                    last = obj
+                    if obj.get("event") == "stream":
+                        stream_count += 1
+                        stream_bytes += int(obj.get("bytes") or 0)
+        except Exception:  # noqa: BLE001  读失败跳过该文件
+            continue
+        if not first:
+            continue
+        done = (last or {}).get("event") == "done"
+        start_ts = first.get("ts")
+        tasks.append({
+            "task_id": tid,
+            "start_ts": start_ts,
+            "start_time": time.strftime("%H:%M:%S", time.localtime(start_ts or time.time())),
+            "tier": first.get("tier"),
+            "via": first.get("via"),
+            "prompt": first.get("prompt", ""),
+            "status": "done" if done else "running",
+            "exit_code": (last or {}).get("exit_code"),
+            "ok": (last or {}).get("ok"),
+            "duration_ms": (last or {}).get("duration_ms"),
+            "stream_count": stream_count,
+            "stream_bytes": stream_bytes,
+            "mtime": os.path.getmtime(fp),
+        })
+    tasks.sort(key=lambda t: (t.get("start_ts") or 0), reverse=True)
+    return {"time": time_str(), "count": len(tasks), "tasks": tasks}
+
+
+def dispatch_live_events(task_id):
+    """单个任务的完整事件流（/api/dispatch/live/<task_id>）。文件不存在返回 None。"""
+    fp = os.path.join(DISPATCH_LIVE_DIR, task_id + ".jsonl")
+    if not os.path.isfile(fp):
+        return None
+    events = []
+    try:
+        with open(fp, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except Exception:  # noqa: BLE001
+                    continue
+    except Exception:  # noqa: BLE001
+        return None
+    return events
+
+
+def _port_holder(port):
+    """返回监听指定端口的进程诊断信息（pid/exe/cmd），无占用返回 None。"""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["netstat", "-ano", "-p", "tcp"],
+            capture_output=True, text=True, timeout=5).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and f":{port}" in parts[1] and parts[3] == "LISTENING":
+            pid = parts[4]
+            exe = cmd = ""
+            try:
+                info = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command",
+                     "Get-CimInstance Win32_Process -Filter 'ProcessId={0}' | "
+                     "Select-Object ExecutablePath,CommandLine | ConvertTo-Json -Compress".format(pid)],
+                    capture_output=True, text=True, timeout=8).stdout.strip()
+                if info:
+                    obj = json.loads(info)
+                    exe = obj.get("ExecutablePath") or ""
+                    cmd = obj.get("CommandLine") or ""
+            except Exception:  # noqa: BLE001
+                pass
+            return {"pid": pid, "exe": exe, "cmd": cmd}
+    return None
+
+
+def _bind_server(port, handler):
+    """绑定端口；失败则 fail closed：记录占用方并返回 None，绝不自动杀进程。
+
+    GPT Extended 裁定 R1-04（2026-08-29）：崩溃进程退出后内核会关 socket，不会留下
+    残留 LISTENING；若 bind 失败说明存在另一活实例，应由 SCM 暴露问题而非自裁决杀死。
+    HTTPServer 默认 allow_reuse_address(SO_REUSEADDR)，Windows 下会"假绑定"成功但收不到
+    连接（被先占者抢走），故 bind 前先查占用，已占用同样 fail closed。
+    """
+    holder = _port_holder(port)
+    if holder:
+        print("[FAIL-CLOSED] 端口 %s 已被进程占用，未自动清理（如需接管请先停该进程）："
+              % port, flush=True)
+        print("  PID=%s  EXE=%s" % (holder["pid"], holder["exe"] or "?"), flush=True)
+        print("  CMD=%s" % (holder["cmd"] or "?"), flush=True)
+        return None
+    try:
+        return ThreadedServer((BIND_HOST, port), handler)
+    except OSError as e:
+        print("[FAIL-CLOSED] 端口 %s 绑定失败: %s" % (port, e), flush=True)
+        return None
+
+
+# 服务模式退出码约定（NSSM 按码配置恢复策略：Default=Restart；3102/3103/3104=Exit 不循环）
+PORT_BIND_FAILED_EXIT = 3102
+STORAGE_NOT_READY_EXIT = 3103
+CONFIG_ERROR_EXIT = 3104
+
+
+def _readiness_preflight():
+    """服务启动前置检查：代码/data/runs 目录与关键配置就绪后才 bind。失败返回原因串。"""
+    base = os.path.dirname(os.path.abspath(__file__))
+    data_dir = channels.DATA_DIR
+    checks = []
+    if not os.path.isdir(base):
+        checks.append("code_dir 不存在: " + base)
+    if not os.path.isdir(data_dir):
+        checks.append("data_dir 不存在: " + data_dir)
+    cfg = os.path.join(data_dir, "channels.json")
+    if not (os.path.isfile(cfg) and os.access(cfg, os.R_OK)):
+        checks.append("channels.json 不可读: " + cfg)
+    runs_dir = os.path.join(base, "runs")
+    if not (os.path.isdir(runs_dir) and os.access(runs_dir, os.W_OK)):
+        checks.append("runs_dir 不可写: " + runs_dir)
+    return "; ".join(checks) if checks else None
+
+
+if __name__ == "__main__":
+    import time
+    pre = _readiness_preflight()
+    deadline = time.time() + 30
+    while pre and time.time() < deadline:
+        print("⚠️  " + pre + " —— 5 秒后重试（等待 D 盘/存储就绪）...", flush=True)
+        time.sleep(5)
+        pre = _readiness_preflight()
+    if pre:
+        print("❌ " + pre, flush=True)
+        sys.exit(STORAGE_NOT_READY_EXIT)
+    if BIND_WILDCARD_UNAUTHORIZED:
+        print("[FAIL-CLOSED] API_GATEWAY_BIND=%r 请求全接口监听但未显式授权："
+              "需设 API_GATEWAY_ALLOW_WILDCARD=1 才允许 wildcard 地址（0.0.0.0/:: 及其展开/映射形式）。拒绝启动。"
+              % BIND_RAW, flush=True)
+        sys.exit(CONFIG_ERROR_EXIT)
+    print("🌐 [API 转发网关] http://" + BIND_HOST + ":" + str(PORT))
+    channels.warm_start()
+    print("LLM 渠道：")
+    for cid, h in channels.cached_health_all().items():
+        flag = "✅" if (h["key_set"] and h["reachable"]) else ("🟡" if h["key_set"] else "⚪")
+        print("  " + flag + " " + cid + " " + channels.CHANNELS[cid]["name"] + " " + (h.get("error", "") or "")[:40])
+    try:
+        import heartbeat
+        heartbeat.start_heartbeat(
+            gateway_id="api_gateway", name="API 转发网关", icon="⚡",
+            description="多厂商 LLM 聚合转发（opencode 第一优先）OpenAI 兼容",
+            port=PORT)
+        print("❤️  心跳上报已启动 (central " + heartbeat.CENTRAL_URL + ")")
+    except Exception as e:  # noqa: BLE001
+        print("⚠️  心跳上报未启动: " + str(e)[:80])
+    # GWS-3100 RQ1（2026-09-01 终审）：3102 前仅对 bind 做退避重试，覆盖旧实例
+    # 自然退出的窗口（5 次尝试，约 65s）；仍失败则维持 fail-closed 交外部恢复。
+    server = None
+    for delay in (0, 5, 10, 20, 30):
+        if delay:
+            time.sleep(delay)
+        server = _bind_server(PORT, GatewayHandler)
+        if server:
+            break
+    if server is None:
+        sys.exit(PORT_BIND_FAILED_EXIT)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()

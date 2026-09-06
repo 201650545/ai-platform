@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>派发中心 · 三级派发矩阵</title>
+<link rel="icon" type="image/png" href="/img/brand/favicon.png">
+<script>
+(function(){
+ try{
+  var t=localStorage.getItem('gw-theme');
+  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+  document.documentElement.setAttribute('data-style',localStorage.getItem('gw-style')||'monet');
+  var s=localStorage.getItem('gw-accent');
+  if(s){var p=JSON.parse(s);if(p&&p.a){
+    document.documentElement.style.setProperty('--accent',p.a);
+    document.documentElement.style.setProperty('--accent2',p.b||p.a);}
+  }
+ }catch(e){document.documentElement.setAttribute('data-theme','light');}
+})();
+</script>
+<style>
+:root{
+  --accent:#0a84ff; --accent2:#5e5ce6;
+  --acc-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --acc-softer:color-mix(in srgb,var(--accent) 8%,transparent);
+  --acc-glow:color-mix(in srgb,var(--accent) 42%,transparent);
+  --acc-t:color-mix(in srgb,var(--accent) 72%,#141b2e);
+  --bg1:#eef1f8; --bg2:#e4e9f4;
+  --glass:rgba(255,255,255,.52); --glass2:rgba(255,255,255,.68);
+  --gborder:rgba(255,255,255,.66); --hl:rgba(255,255,255,.85);
+  --head-bg:rgba(255,255,255,.55); --thead:rgba(255,255,255,.4);
+  --t:#1d1d1f; --t2:#55555c; --t3:#7a7a82; --t4:#aeaeb4;
+  --line:rgba(29,29,31,.14); --line2:rgba(29,29,31,.08);
+  --green:#1fa54f; --green-bg:rgba(48,209,88,.17);
+  --orange:#c97400; --orange-bg:rgba(255,159,10,.18);
+  --red:#e0332a; --red-bg:rgba(255,59,48,.13);
+}
+:root[data-theme="dark"]{
+  --bg1:#0d1117; --bg2:#0a0e14;
+  --glass:rgba(255,255,255,.05); --glass2:rgba(255,255,255,.08);
+  --gborder:rgba(255,255,255,.1); --hl:rgba(255,255,255,.12);
+  --head-bg:rgba(255,255,255,.06); --thead:rgba(255,255,255,.05);
+  --t:#f2f4f8; --t2:#b0b6c0; --t3:#7d8490; --t4:#565c66;
+  --line:rgba(255,255,255,.14); --line2:rgba(255,255,255,.07);
+  --acc-t:color-mix(in srgb,var(--accent) 84%,#ffffff);
+  --green:#4cd37f; --green-bg:rgba(48,209,88,.12);
+  --orange:#f0a53a; --orange-bg:rgba(255,159,10,.14);
+  --red:#ff6b61; --red-bg:rgba(255,59,48,.14);
+}
+
+/* ═══════════ 五套艺术风格（与 api_page.html 同步） ═══════════ */
+/* ① 莫奈 · 印象 */
+:root[data-style="monet"]{
+  --fh:Georgia,"Palatino","STZhongsong","KaiTi",serif;
+  --radius:26px;--radius-s:16px;
+  --shadow:0 10px 36px rgba(70,80,120,.12)}
+:root[data-style="monet"][data-theme="dark"]{
+  --bg1:#12131c;--bg2:#171927;
+  --glass:rgba(38,41,58,.55);--glass2:rgba(46,50,70,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eceef8;--t2:#c6c9dc;--t3:#969ab4;--t4:#63667e;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ② 梵高 · 后印象 */
+:root[data-style="vangogh"]{
+  --fh:"Segoe UI Black","Arial Black","Microsoft YaHei",sans-serif;
+  --radius:18px;--radius-s:12px;
+  --shadow:0 10px 34px rgba(20,40,90,.16)}
+:root[data-style="vangogh"][data-theme="dark"]{
+  --bg1:#0e1220;--bg2:#141a2e;
+  --glass:rgba(28,34,54,.55);--glass2:rgba(36,44,68,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eef1fa;--t2:#c8cde0;--t3:#979cb6;--t4:#64687f;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.42)}
+/* ③ 留白 · 水墨 */
+:root[data-style="ink"]{
+  --sf:"Source Han Serif SC","Noto Serif SC","SimSun","Songti SC",serif;
+  --fh:"KaiTi","STKaiti","楷体","SimSun",serif;
+  --radius:8px;--radius-s:5px;
+  --bg1:#fafaf6;--bg2:#f2f1ea;
+  --glass:rgba(255,255,255,.72);--glass2:rgba(255,255,255,.86);
+  --gborder:rgba(42,42,40,.17);--hl:rgba(255,255,255,.9);
+  --thead:rgba(42,42,40,.06);
+  --t:#2a2a28;--t2:#55554f;--t3:#7d7d75;--t4:#a8a89e;
+  --line:rgba(42,42,40,.18);--line2:rgba(42,42,40,.09);
+  --shadow:0 6px 22px rgba(40,40,36,.08)}
+:root[data-style="ink"] body{letter-spacing:.02em}
+:root[data-style="ink"] h1{letter-spacing:.08em;font-weight:600}
+:root[data-style="ink"] .card,:root[data-style="ink"] .hist{backdrop-filter:blur(10px) saturate(108%);-webkit-backdrop-filter:blur(10px) saturate(108%)}
+:root[data-style="ink"][data-theme="dark"]{
+  --bg1:#151513;--bg2:#1d1d1a;
+  --glass:rgba(38,38,34,.55);--glass2:rgba(46,46,40,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eceae2;--t2:#c4c2b8;--t3:#96948a;--t4:#63615a;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ④ 现代 · 画廊 */
+:root[data-style="modern"]{
+  --fh:"Segoe UI","Helvetica Neue","Microsoft YaHei",sans-serif;
+  --radius:12px;--radius-s:8px;
+  --bg1:#f6f6f4;--bg2:#eeeeec;
+  --glass:rgba(255,255,255,.78);--glass2:rgba(255,255,255,.9);
+  --gborder:rgba(20,20,22,.18);--hl:rgba(255,255,255,.95);
+  --thead:rgba(20,20,22,.06);
+  --shadow:0 4px 18px rgba(15,15,20,.1)}
+:root[data-style="modern"] h1{letter-spacing:-.045em;font-weight:900}
+:root[data-style="modern"] .card,:root[data-style="modern"] .hist{backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%)}
+:root[data-style="modern"][data-theme="dark"]{
+  --bg1:#111114;--bg2:#18181c;
+  --glass:rgba(32,32,38,.62);--glass2:rgba(40,40,47,.78);
+  --gborder:rgba(255,255,255,.14);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#f0f0f2;--t2:#c9c9cf;--t3:#96969e;--t4:#64646c;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ⑤ 苹果 · 液态玻璃 */
+:root[data-style="liquid"]{
+  --fh:"SF Pro Display",-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  --radius:30px;--radius-s:20px;
+  --bg1:#f1f3f6;--bg2:#e6e9ef;
+  --glass:rgba(255,255,255,.46);--glass2:rgba(255,255,255,.58);
+  --gborder:rgba(255,255,255,.16);--hl:rgba(255,255,255,.95);
+  --thead:rgba(255,255,255,.4);
+  --shadow:0 18px 44px rgba(28,35,55,.09),0 3px 9px rgba(28,35,55,.045),inset 0 1px 0 rgba(255,255,255,.82),inset 0 -1px 0 rgba(30,38,55,.075)}
+:root[data-style="liquid"] .card,:root[data-style="liquid"] .hist{
+  backdrop-filter:blur(22px) saturate(142%) brightness(1.03);-webkit-backdrop-filter:blur(22px) saturate(142%) brightness(1.03);
+  border-color:rgba(255,255,255,.30);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1.5px 2px rgba(30,38,55,.14),
+    inset 1.5px 0 1px rgba(255,140,190,.07),inset -1.5px 0 1px rgba(120,200,255,.09),
+    0 26px 60px rgba(28,35,55,.13),0 6px 16px rgba(28,35,55,.06)}
+:root[data-style="liquid"] h1{letter-spacing:-.035em;font-weight:800}
+:root[data-style="liquid"] .tic{filter:drop-shadow(0 4px 10px var(--acc-glow)) drop-shadow(0 1px 1px rgba(255,255,255,.65))}
+:root[data-style="liquid"][data-theme="dark"]{
+  --bg1:#0b0d12;--bg2:#04060a;
+  --glass:rgba(22,25,33,.58);--glass2:rgba(32,37,47,.58);
+  --gborder:rgba(255,255,255,.20);--hl:rgba(255,255,255,.26);
+  --thead:rgba(255,255,255,.05);
+  --shadow:0 28px 64px rgba(0,0,0,.42),0 8px 18px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.24)}
+:root[data-style="liquid"][data-theme="dark"] .card,:root[data-style="liquid"][data-theme="dark"] .hist{
+  background:linear-gradient(180deg,rgba(24,27,35,.60),rgba(10,12,17,.44));
+  backdrop-filter:blur(24px) saturate(135%) brightness(.95);-webkit-backdrop-filter:blur(24px) saturate(135%) brightness(.95);
+  border-color:rgba(255,255,255,.20);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.24),inset 0 -1.5px 2px rgba(0,0,0,.30),
+    0 28px 64px rgba(0,0,0,.42),0 8px 18px rgba(0,0,0,.26)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--sf,-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Segoe UI",sans-serif);
+  background:
+    radial-gradient(1200px 500px at 15% -10%,var(--acc-glow),transparent 60%),
+    radial-gradient(900px 400px at 110% 10%,color-mix(in srgb,var(--accent2) 22%,transparent),transparent 55%),
+    linear-gradient(160deg,var(--bg1),var(--bg2));
+  background-attachment:fixed;
+  color:var(--t); min-height:100vh;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;align-items:center;gap:14px;padding:10px 0 22px;flex-wrap:wrap}
+.logo{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:22px;
+  box-shadow:0 6px 18px var(--acc-glow);position:relative}
+.logo img{width:100%;height:100%;display:block;object-fit:cover;border-radius:12px}
+/* nav 3D 悬浮预览 */
+#nav3dPop{position:absolute;top:54px;left:-63px;width:170px;height:170px;border-radius:16px;
+  background:var(--glass);border:1px solid var(--gborder);backdrop-filter:blur(14px);
+  box-shadow:0 14px 34px rgba(0,0,0,.28);opacity:0;pointer-events:none;transform:translateY(-6px);
+  transition:opacity .18s ease,transform .18s ease;z-index:50;overflow:hidden}
+#nav3dPop.on{opacity:1;pointer-events:auto;transform:translateY(0)}
+#nav3dPop model-viewer{width:100%;height:100%;background:transparent;--poster-color:transparent}
+#nav3dPop .f3d{width:100%;height:100%;object-fit:cover}
+h1{font-size:22px;font-weight:700;letter-spacing:.2px;font-family:var(--fh,inherit)}
+.sub{color:var(--t3);font-size:13px;margin-top:2px}
+.pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;
+  background:var(--glass);border:1px solid var(--gborder);font-size:13px;color:var(--t2);backdrop-filter:blur(14px)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--t4)}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--glass);border:1px solid var(--gborder);border-radius:var(--radius,20px);padding:20px;
+  backdrop-filter:blur(18px);box-shadow:0 8px 30px rgba(0,0,0,.06);position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.8}
+.card.b::before{background:linear-gradient(90deg,#30d158,#0a84ff)}
+.card.c::before{background:linear-gradient(90deg,#ff9f0a,#ff375f)}
+.tier-badge{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;font-size:16px}
+.card.b .tier-badge{background:linear-gradient(135deg,#30d158,#0a84ff)}
+.card.c .tier-badge{background:linear-gradient(135deg,#ff9f0a,#ff375f)}
+.card h2{font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:4px;font-family:var(--fh,inherit)}
+.card .desc{font-size:12.5px;color:var(--t3);margin-bottom:14px;line-height:1.5}
+.slot{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-s,12px);background:var(--hl);
+  border:1px solid var(--line2);margin-bottom:8px}
+.slot:last-child{margin-bottom:0}
+.slot .ic{width:32px;height:32px;flex:none;display:inline-flex;align-items:center;justify-content:center;
+  object-fit:contain;border-radius:8px;padding:3px;font-size:17px;
+  background:var(--acc-soft);border:1px solid var(--acc-softer)}
+.slot .meta{flex:1;min-width:0;line-height:1.3}
+/* 区块级定制图标：真实生成图(JPG/PNG)，随主题由 acc 光晕染色 */
+.tic{width:34px;height:34px;flex:none;border-radius:9px;overflow:hidden;box-sizing:border-box;
+  border:1px solid var(--acc-softer);filter:drop-shadow(0 2px 6px var(--acc-glow))}
+.tic img{width:100%;height:100%;display:block;object-fit:cover}
+/* ===== 图标 3D 动效（悬停倾斜+呼吸浮动） ===== */
+@keyframes diconFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+.tic,.logo{perspective:280px;animation:diconFloat 4.2s ease-in-out infinite}
+.tic img,.logo img{transition:transform .16s ease-out,box-shadow .16s ease-out;will-change:transform}
+@media (prefers-reduced-motion: reduce){.tic,.logo{animation:none}}
+.slot .sname{font-size:13px;font-weight:600}
+.slot .smodel{font-size:11.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot .sstat{flex:none;margin-left:auto;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.badge{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700}
+.badge.ok{color:var(--green);background:var(--green-bg)}
+.badge.warn{color:var(--orange);background:var(--orange-bg)}
+.badge.err{color:var(--red);background:var(--red-bg)}
+.hist{background:var(--glass);border:1px solid var(--gborder);border-radius:var(--radius,20px);padding:20px;margin-top:16px;
+  backdrop-filter:blur(18px)}
+.hist h2{font-size:16px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-family:var(--fh,inherit)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;color:var(--t3);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);
+  background:var(--thead);position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid var(--line2);color:var(--t2);vertical-align:top}
+td.p{color:var(--t);font-weight:500}
+.tbadge{display:inline-block;min-width:20px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:800;font-size:11px;color:#fff}
+.tA{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.tB{background:linear-gradient(135deg,#30d158,#0a84ff)}
+.tC{background:linear-gradient(135deg,#ff9f0a,#ff375f)}
+.empty{color:var(--t4);text-align:center;padding:26px 0;font-size:13px}
+footer{margin-top:18px;text-align:center;color:var(--t4);font-size:11.5px}
+.refresh{position:fixed;right:22px;bottom:22px;width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:20px;
+  box-shadow:0 8px 24px var(--acc-glow);transition:transform .15s}
+.refresh:hover{transform:scale(1.08)}
+.refresh:active{transform:scale(.94)}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><img src="/img/icon-dispatch-nav.jpg" alt="派发" data-dicon="nav"><div id="nav3dPop"></div></div>
+    <div>
+      <h1>派发中心 · 三级派发矩阵</h1>
+      <div class="sub">统一派发入口 dispatch.py · 默认全免费，--paid 仅显式授权</div>
+    </div>
+    <div class="pill"><span class="dot" id="liveDot"></span><span id="liveText">读取中…</span></div>
+  </header>
+
+  <div class="grid">
+    <div class="card a">
+      <h2><span class="tic"><img src="/img/icon-dispatch-model.jpg" alt="" data-dicon="model"></span> 免费模型</h2>
+      <div class="desc">纯文本任务：总结 / 命名 / 翻译 / 文本分析<br>只读，不写文件、不开浏览器</div>
+      <div class="slot">
+        <img class="ic" src="https://www.deepseek.com/favicon.ico" alt="DeepSeek">
+        <div class="meta"><div class="sname">subagent → :3100</div><div class="smodel">deepseek-free / fast（免费组）</div></div>
+        <div class="sstat"><span class="badge" id="aStat">检测中</span></div>
+      </div>
+    </div>
+
+    <div class="card b">
+      <h2><span class="tic"><img src="/img/icon-dispatch-agent.jpg" alt="" data-dicon="agent"></span> 程序 Agent</h2>
+      <div class="desc">写码 / 写文件 / 批处理<br>目录感知、可读写</div>
+      <div class="slot">
+        <img class="ic" src="https://www.trae.com/favicon.svg" alt="TRAE">
+        <div class="meta"><div class="sname">TRAE SOLO（默认）</div><div class="smodel">锁 DeepSeek V4 Flash 正式版</div></div>
+        <div class="sstat"><span class="badge" id="bTraeStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="https://img.alicdn.com/imgextra/i4/O1CN01QkSxiCocd3D0prc8_!!6000000008124-2-tps-412-412.png" alt="Qoder">
+        <div class="meta"><div class="sname">Qoder CLI（备选）</div><div class="smodel">千问 3.8-flash</div></div>
+        <div class="sstat"><span class="badge" id="bQoderStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="https://www.cursor.com/favicon.ico" alt="Cursor">
+        <div class="meta"><div class="sname">Cursor Agent</div><div class="smodel">cursor-agent CLI</div></div>
+        <div class="sstat"><span class="badge" id="bCursorStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="/img/brand/workbuddy.png" alt="WorkBuddy">
+        <div class="meta"><div class="sname">WorkBuddy</div><div class="smodel">hy4-preview · 内嵌 CodeBuddy CLI</div></div>
+        <div class="sstat"><span class="badge" id="bWorkStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="https://lf-flow-web-cdn.doubao.com/obj/flow-doubao/doubao/chat/favicon-doubao.png" alt="豆包">
+        <div class="meta"><div class="sname">豆包 电脑版</div><div class="smodel">doubao-app · 聊天页 CDP</div></div>
+        <div class="sstat"><span class="badge" id="bDoubaoStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="https://img.alicdn.com/imgextra/i4/O1CN018ikLCF1sGya2c3YY4_!!6000000005740-55-tps-206-206.svg" alt="QoderWork">
+        <div class="meta"><div class="sname">QoderWork CN</div><div class="smodel">内嵌 qoderclicn.exe</div></div>
+        <div class="sstat"><span class="badge" id="bQoderworkStat">检测中</span></div>
+      </div>
+    </div>
+
+    <div class="card c">
+      <h2><span class="tic"><img src="/img/icon-dispatch-browser.jpg" alt="" data-dicon="browser"></span> 浏览器</h2>
+      <div class="desc">问诊 / 评审 / 上游疑难 / 网页操作<br>需真实浏览器登录态</div>
+      <div class="slot">
+        <span class="ic">🌐</span>
+        <div class="meta"><div class="sname">opencli（日常 Chrome）</div><div class="smodel">GPT 镜像站 · Kimi K3 · 164 site adapters</div></div>
+        <div class="sstat"><span class="badge" id="cStat">检测中</span></div>
+      </div>
+      <div class="slot">
+        <img class="ic" src="https://g.alicdn.com/sail-web/maas/2.13.138/favicon/128.ico" alt="ModelScope">
+        <div class="meta"><div class="sname">modelscope 每日魔粒</div><div class="smodel">计划任务 · 每日 6 次</div></div>
+        <div class="sstat"><span class="badge" id="mStat">检测中</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hist">
+    <h2><span class="tic"><img src="/img/icon-dispatch-matrix.jpg" alt="" data-dicon="matrix"></span> 最近派发记录</h2>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>时间</th><th>级</th><th>执行位</th><th>任务</th><th>付费</th><th>结果</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+    </div>
+    <div class="empty" id="histEmpty" style="display:none">暂无派发记录 —— 用 dispatch.py 派发任务后会显示在这里</div>
+  </div>
+
+  <footer>api_gateway :3100 · dispatch.py · D-GLOBAL-20260831-01 三级派发</footer>
+</div>
+<button class="refresh" title="刷新" onclick="load()">↻</button>
+
+<script>
+const $=id=>document.getElementById(id);
+function setBadge(el,st,label){
+  const m={ok:['ok','🟢 '+label],warn:['warn','🟡 '+label],err:['err','🔴 '+label],unknown:['warn','◻️ '+label]};
+  el.className='badge '+m[st][0]; el.textContent=m[st][1];
+}
+async function load(){
+  try{
+    const r=await fetch('/api/dispatch/status');
+    const d=await r.json();
+    $('liveDot').className='dot on';
+    $('liveText').textContent='已连接 · 更新于 '+d.time;
+    setBadge($('aStat'),d.a.ok?'ok':'err', d.a.ok?'在线 · '+d.a.detail:'离线 · '+(d.a.detail||''));
+    setBadge($('bTraeStat'),d.b.trae?'ok':'err', d.b.trae?'已连接':'未连接');
+    setBadge($('bQoderStat'),d.b.qoder?'ok':'err', d.b.qoder?'可用':'不可用');
+    setBadge($('bCursorStat'),d.b.cursor?'ok':'err', d.b.cursor?'已装':'缺失');
+    setBadge($('bWorkStat'),d.b.workbuddy?'ok':'err', d.b.workbuddy?'存在':'缺失');
+    setBadge($('bDoubaoStat'),d.b.doubao?'ok':'err', d.b.doubao?'已连接':'未连接');
+    setBadge($('bQoderworkStat'),d.b.qoderwork?'ok':'err', d.b.qoderwork?'存在':'缺失');
+    setBadge($('cStat'),d.c.ok?'ok':'err', d.c.ok?'桥接正常':'离线');
+    setBadge($('mStat'),d.modelscope.ok?'ok':'err', d.modelscope.ok?('任务就绪 · 上次 '+d.modelscope.last):('异常 · '+(d.modelscope.last||'')));
+    const rows=d.history||[];
+    const tb=$('histBody');
+    tb.innerHTML=rows.map(h=>`<tr>
+      <td style="white-space:nowrap">${h.ts||''}</td>
+      <td><span class="tbadge t${h.tier||'A'}">${h.tier||'-'}</span></td>
+      <td>${h.via||''}</td>
+      <td class="p" style="max-width:380px">${esc(h.prompt||'')}</td>
+      <td>${h.paid?'<span class="badge warn">付费</span>':'<span style="color:var(--t4)">免费</span>'}</td>
+      <td>${h.ok?'<span class="badge ok">成功</span>':'<span class="badge err">失败</span>'}</td>
+    </tr>`).join('');
+    $('histEmpty').style.display=rows.length?'none':'block';
+  }catch(e){
+    $('liveDot').className='dot';
+    $('liveText').textContent='读取失败';
+    setBadge($('aStat'),'err','不可达');
+  }
+}
+function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+load();
+setInterval(load,15000);
+
+/* 图标悬停 3D 倾斜跟随 */
+(function(){
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  document.querySelectorAll('.tic,.logo').forEach(function(el,i){
+    el.style.animationDelay=(i*0.45)+'s';
+    var img=el.querySelector('img');
+    if(!img)return;
+    el.addEventListener('mousemove',function(e){
+      var r=el.getBoundingClientRect();
+      var x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
+      img.style.transform='rotateX('+(-y*20).toFixed(1)+'deg) rotateY('+(x*20).toFixed(1)+'deg) scale(1.07)';
+      img.style.boxShadow='0 6px 16px rgba(0,0,0,.28)';
+    });
+    el.addEventListener('mouseleave',function(){
+      img.style.transform='';img.style.boxShadow='';
+    });
+  });
+})();
+/* nav logo 悬停浮出 3D 预览（懒加载 model-viewer，GLB 缺失时回退静态图） */
+(function(){
+  var pop=document.getElementById('nav3dPop');if(!pop)return;
+  var logo=pop.closest('.logo');if(!logo)return;var started=false;
+  function start(){
+    if(started)return;started=true;
+    var s=document.createElement('script');s.type='module';
+    s.src='https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+    s.onerror=function(){fallback();};
+    document.head.appendChild(s);
+    var mv=document.createElement('model-viewer');
+    mv.setAttribute('src','/img/icon-dispatch-nav-3d.glb');
+    mv.setAttribute('camera-controls','');mv.setAttribute('auto-rotate','');
+    mv.setAttribute('shadow-intensity','1');mv.setAttribute('alt','nav 3D');
+    mv.addEventListener('error',fallback);
+    pop.appendChild(mv);
+    setTimeout(function(){
+      var m=pop.querySelector('model-viewer');
+      if(m&&(!m.loaded&&!document.defaultView.customElements.get('model-viewer')))fallback();
+    },6000);
+  }
+  function fallback(){
+    if(pop.querySelector('.f3d'))return;
+    pop.innerHTML='';
+    var im=document.createElement('img');im.className='f3d';
+    var st=document.documentElement.getAttribute('data-style')||'monet';
+    im.src='/img/icon-dispatch-nav-'+st+'.jpg';
+    im.onerror=function(){this.onerror=null;this.src='/img/icon-dispatch-nav.jpg';};
+    pop.appendChild(im);
+  }
+  logo.addEventListener('mouseenter',function(){pop.classList.add('on');start();});
+  logo.addEventListener('mouseleave',function(){pop.classList.remove('on');});
+})();
+function switchIcons(){
+  var style=document.documentElement.getAttribute('data-style')||'monet';
+  document.querySelectorAll('img[data-dicon]').forEach(function(img){
+    var base=img.getAttribute('data-dicon');
+    var themed='/img/icon-dispatch-'+base+'-'+style+'.jpg';
+    var fallback='/img/icon-dispatch-'+base+'.jpg';
+    img.onerror=function(){this.onerror=null;this.src=fallback;};
+    img.src=themed;
+  });
+}
+switchIcons();
+new MutationObserver(function(muts){
+  muts.forEach(function(m){
+    if(m.attributeName==='data-style')switchIcons();
+  });
+}).observe(document.documentElement,{attributes:true,attributeFilter:['data-style']});
+</script>
+</body>
+</html>
