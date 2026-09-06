@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "apps", "component-orchestrator"))
 for p in (BASE, ORCH_DIR):
     if os.path.isdir(p):
         sys.path.insert(0, p)

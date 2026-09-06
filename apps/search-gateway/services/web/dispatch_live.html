@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运行实况 · 派发中心三级页</title>
+<link rel="icon" type="image/png" href="/img/brand/favicon.png">
+<script>
+(function(){
+ try{
+  var t=localStorage.getItem('gw-theme');
+  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+  document.documentElement.setAttribute('data-style',localStorage.getItem('gw-style')||'monet');
+  var s=localStorage.getItem('gw-accent');
+  if(s){var p=JSON.parse(s);if(p&&p.a){
+    document.documentElement.style.setProperty('--accent',p.a);
+    document.documentElement.style.setProperty('--accent2',p.b||p.a);}
+  }
+ }catch(e){document.documentElement.setAttribute('data-theme','light');}
+})();
+</script>
+<style>
+:root{
+  --accent:#0a84ff; --accent2:#5e5ce6;
+  --acc-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --acc-softer:color-mix(in srgb,var(--accent) 8%,transparent);
+  --acc-glow:color-mix(in srgb,var(--accent) 42%,transparent);
+  --acc-t:color-mix(in srgb,var(--accent) 72%,#141b2e);
+  --bg1:#eef1f8; --bg2:#e4e9f4;
+  --glass:rgba(255,255,255,.52); --glass2:rgba(255,255,255,.68);
+  --gborder:rgba(255,255,255,.66); --hl:rgba(255,255,255,.85);
+  --head-bg:rgba(255,255,255,.55); --thead:rgba(255,255,255,.4);
+  --t:#1d1d1f; --t2:#55555c; --t3:#7a7a82; --t4:#aeaeb4;
+  --line:rgba(29,29,31,.14); --line2:rgba(29,29,31,.08);
+  --green:#1fa54f; --green-bg:rgba(48,209,88,.17);
+  --orange:#c97400; --orange-bg:rgba(255,159,10,.18);
+  --red:#e0332a; --red-bg:rgba(255,59,48,.13);
+  --priv:#e0332a; --priv-bg:rgba(255,87,34,.16);
+}
+:root[data-theme="dark"]{
+  --bg1:#0d1117; --bg2:#0a0e14;
+  --glass:rgba(255,255,255,.05); --glass2:rgba(255,255,255,.08);
+  --gborder:rgba(255,255,255,.1); --hl:rgba(255,255,255,.12);
+  --head-bg:rgba(255,255,255,.06); --thead:rgba(255,255,255,.05);
+  --t:#f2f4f8; --t2:#b0b6c0; --t3:#7d8490; --t4:#565c66;
+  --line:rgba(255,255,255,.14); --line2:rgba(255,255,255,.07);
+  --acc-t:color-mix(in srgb,var(--accent) 84%,#ffffff);
+  --green:#4cd37f; --green-bg:rgba(48,209,88,.12);
+  --orange:#f0a53a; --orange-bg:rgba(255,159,10,.14);
+  --red:#ff6b61; --red-bg:rgba(255,59,48,.14);
+  --priv:#ff6b4a; --priv-bg:rgba(255,87,34,.18);
+}
+
+/* ═══════════ 五套艺术风格（与 dispatch.html / api_page.html 同步） ═══════════ */
+/* ① 莫奈 · 印象 */
+:root[data-style="monet"]{
+  --fh:Georgia,"Palatino","STZhongsong","KaiTi",serif;
+  --radius:26px;--radius-s:16px;
+  --shadow:0 10px 36px rgba(70,80,120,.12)}
+:root[data-style="monet"][data-theme="dark"]{
+  --bg1:#12131c;--bg2:#171927;
+  --glass:rgba(38,41,58,.55);--glass2:rgba(46,50,70,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eceef8;--t2:#c6c9dc;--t3:#969ab4;--t4:#63667e;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ② 梵高 · 后印象 */
+:root[data-style="vangogh"]{
+  --fh:"Segoe UI Black","Arial Black","Microsoft YaHei",sans-serif;
+  --radius:18px;--radius-s:12px;
+  --shadow:0 10px 34px rgba(20,40,90,.16)}
+:root[data-style="vangogh"][data-theme="dark"]{
+  --bg1:#0e1220;--bg2:#141a2e;
+  --glass:rgba(28,34,54,.55);--glass2:rgba(36,44,68,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eef1fa;--t2:#c8cde0;--t3:#979cb6;--t4:#64687f;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.42)}
+/* ③ 留白 · 水墨 */
+:root[data-style="ink"]{
+  --sf:"Source Han Serif SC","Noto Serif SC","SimSun","Songti SC",serif;
+  --fh:"KaiTi","STKaiti","楷体","SimSun",serif;
+  --radius:8px;--radius-s:5px;
+  --bg1:#fafaf6;--bg2:#f2f1ea;
+  --glass:rgba(255,255,255,.72);--glass2:rgba(255,255,255,.86);
+  --gborder:rgba(42,42,40,.17);--hl:rgba(255,255,255,.9);
+  --thead:rgba(42,42,40,.06);
+  --t:#2a2a28;--t2:#55554f;--t3:#7d7d75;--t4:#a8a89e;
+  --line:rgba(42,42,40,.18);--line2:rgba(42,42,40,.09);
+  --shadow:0 6px 22px rgba(40,40,36,.08)}
+:root[data-style="ink"] body{letter-spacing:.02em}
+:root[data-style="ink"] h1{letter-spacing:.08em;font-weight:600}
+:root[data-style="ink"] .card{backdrop-filter:blur(10px) saturate(108%);-webkit-backdrop-filter:blur(10px) saturate(108%)}
+:root[data-style="ink"][data-theme="dark"]{
+  --bg1:#151513;--bg2:#1d1d1a;
+  --glass:rgba(38,38,34,.55);--glass2:rgba(46,46,40,.7);
+  --gborder:rgba(255,255,255,.12);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#eceae2;--t2:#c4c2b8;--t3:#96948a;--t4:#63615a;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ④ 现代 · 画廊 */
+:root[data-style="modern"]{
+  --fh:"Segoe UI","Helvetica Neue","Microsoft YaHei",sans-serif;
+  --radius:12px;--radius-s:8px;
+  --bg1:#f6f6f4;--bg2:#eeeeec;
+  --glass:rgba(255,255,255,.78);--glass2:rgba(255,255,255,.9);
+  --gborder:rgba(20,20,22,.18);--hl:rgba(255,255,255,.95);
+  --thead:rgba(20,20,22,.06);
+  --shadow:0 4px 18px rgba(15,15,20,.1)}
+:root[data-style="modern"] h1{letter-spacing:-.045em;font-weight:900}
+:root[data-style="modern"] .card{backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%)}
+:root[data-style="modern"][data-theme="dark"]{
+  --bg1:#111114;--bg2:#18181c;
+  --glass:rgba(32,32,38,.62);--glass2:rgba(40,40,47,.78);
+  --gborder:rgba(255,255,255,.14);--hl:rgba(255,255,255,.1);
+  --thead:rgba(255,255,255,.045);
+  --t:#f0f0f2;--t2:#c9c9cf;--t3:#96969e;--t4:#64646c;
+  --line:rgba(255,255,255,.14);--line2:rgba(255,255,255,.07);
+  --shadow:0 6px 22px rgba(0,0,0,.4)}
+/* ⑤ 苹果 · 液态玻璃 */
+:root[data-style="liquid"]{
+  --fh:"SF Pro Display",-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  --radius:30px;--radius-s:20px;
+  --bg1:#f1f3f6;--bg2:#e6e9ef;
+  --glass:rgba(255,255,255,.46);--glass2:rgba(255,255,255,.58);
+  --gborder:rgba(255,255,255,.16);--hl:rgba(255,255,255,.95);
+  --thead:rgba(255,255,255,.4);
+  --shadow:0 18px 44px rgba(28,35,55,.09),0 3px 9px rgba(28,35,55,.045),inset 0 1px 0 rgba(255,255,255,.82),inset 0 -1px 0 rgba(30,38,55,.075)}
+:root[data-style="liquid"] .card{
+  backdrop-filter:blur(22px) saturate(142%) brightness(1.03);-webkit-backdrop-filter:blur(22px) saturate(142%) brightness(1.03);
+  border-color:rgba(255,255,255,.30);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),inset 0 -1.5px 2px rgba(30,38,55,.14),
+    inset 1.5px 0 1px rgba(255,140,190,.07),inset -1.5px 0 1px rgba(120,200,255,.09),
+    0 26px 60px rgba(28,35,55,.13),0 6px 16px rgba(28,35,55,.06)}
+:root[data-style="liquid"] h1{letter-spacing:-.035em;font-weight:800}
+:root[data-style="liquid"][data-theme="dark"]{
+  --bg1:#0b0d12;--bg2:#04060a;
+  --glass:rgba(22,25,33,.58);--glass2:rgba(32,37,47,.58);
+  --gborder:rgba(255,255,255,.20);--hl:rgba(255,255,255,.26);
+  --thead:rgba(255,255,255,.05);
+  --shadow:0 28px 64px rgba(0,0,0,.42),0 8px 18px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.24)}
+:root[data-style="liquid"][data-theme="dark"] .card{
+  background:linear-gradient(180deg,rgba(24,27,35,.60),rgba(10,12,17,.44));
+  backdrop-filter:blur(24px) saturate(135%) brightness(.95);-webkit-backdrop-filter:blur(24px) saturate(135%) brightness(.95);
+  border-color:rgba(255,255,255,.20);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.24),inset 0 -1.5px 2px rgba(0,0,0,.30),
+    0 28px 64px rgba(0,0,0,.42),0 8px 18px rgba(0,0,0,.26)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--sf,-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Segoe UI",sans-serif);
+  background:
+    radial-gradient(1200px 500px at 15% -10%,var(--acc-glow),transparent 60%),
+    radial-gradient(900px 400px at 110% 10%,color-mix(in srgb,var(--accent2) 22%,transparent),transparent 55%),
+    linear-gradient(160deg,var(--bg1),var(--bg2));
+  background-attachment:fixed;
+  color:var(--t); min-height:100vh;
+}
+.wrap{max-width:1280px;margin:0 auto;padding:28px 20px 60px}
+header{display:flex;align-items:center;gap:14px;padding:10px 0 22px;flex-wrap:wrap}
+.logo{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:22px;
+  box-shadow:0 6px 18px var(--acc-glow)}
+h1{font-size:22px;font-weight:700;letter-spacing:.2px;font-family:var(--fh,inherit)}
+.sub{color:var(--t3);font-size:13px;margin-top:2px}
+.pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;
+  background:var(--glass);border:1px solid var(--gborder);font-size:13px;color:var(--t2);backdrop-filter:blur(14px)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--t4)}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.back{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;text-decoration:none;
+  background:var(--glass);border:1px solid var(--gborder);font-size:13px;color:var(--t2)}
+.back:hover{color:var(--acc-t);border-color:var(--acc-softer)}
+
+/* 主布局：左 task 列表 / 右详情 */
+.main{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.card{background:var(--glass);border:1px solid var(--gborder);border-radius:var(--radius,20px);padding:20px;
+  backdrop-filter:blur(18px);box-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.06));position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.8}
+.card h2{font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:12px;font-family:var(--fh,inherit)}
+
+/* 左栏任务条目 */
+.titem{padding:10px 12px;border-radius:var(--radius-s,12px);background:var(--hl);border:1px solid var(--line2);
+  margin-bottom:8px;cursor:pointer;transition:border-color .15s, background .15s;position:relative}
+.titem:hover{border-color:var(--acc-softer)}
+.titem.sel{border-color:var(--accent);background:var(--acc-softer)}
+.titem .row1{display:flex;align-items:center;gap:8px}
+.titem .tid{font-family:Consolas,Menlo,monospace;font-size:12.5px;font-weight:700;color:var(--t)}
+.titem .ttime{font-size:11px;color:var(--t4);margin-left:auto;white-space:nowrap}
+.titem .row2{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:12px;color:var(--t3)}
+.titem .tprompt{font-size:11.5px;color:var(--t2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tbadge{display:inline-block;min-width:20px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:800;font-size:11px;color:#fff}
+.tA{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+.tB{background:linear-gradient(135deg,#30d158,#0a84ff)}
+.tC{background:linear-gradient(135deg,#ff9f0a,#ff375f)}
+.badge{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700}
+.badge.ok{color:var(--green);background:var(--green-bg)}
+.badge.warn{color:var(--orange);background:var(--orange-bg)}
+.badge.err{color:var(--red);background:var(--red-bg)}
+/* running 呼吸点 + LIVE 标 */
+.breath{width:9px;height:9px;border-radius:50%;background:var(--red);flex:none;
+  animation:breath 1.2s ease-in-out infinite}
+@keyframes breath{0%,100%{opacity:1;box-shadow:0 0 4px var(--red)}50%{opacity:.35;box-shadow:0 0 10px var(--red)}}
+.live-tag{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:6px;font-size:10.5px;
+  font-weight:900;letter-spacing:1px;color:#fff;background:linear-gradient(135deg,#ff375f,#ff9f0a);
+  animation:breath 1.6s ease-in-out infinite}
+.empty{color:var(--t4);text-align:center;padding:26px 0;font-size:13px}
+
+/* 右栏详情 */
+.detail-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.detail-head .dtid{font-family:Consolas,Menlo,monospace;font-size:15px;font-weight:800}
+.meta-line{font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.6}
+.prompt-box{font-size:12.5px;color:var(--t2);background:var(--hl);border:1px solid var(--line2);
+  border-radius:var(--radius-s,12px);padding:10px 12px;margin-bottom:16px;line-height:1.6;word-break:break-all}
+
+/* 纵向时间线 */
+.tl{position:relative;padding-left:22px;margin:6px 0 4px}
+.tl::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2));opacity:.35;border-radius:2px}
+.tl-item{position:relative;padding:7px 0 7px 10px}
+.tl-item::before{content:"";position:absolute;left:-19.5px;top:13px;width:11px;height:11px;border-radius:50%;
+  background:var(--accent);border:2.5px solid var(--bg1);box-shadow:0 0 6px var(--acc-glow)}
+.tl-item.done::before{background:var(--green)}
+.tl-item.stream::before{background:var(--accent2)}
+.tl-item .tl-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.tl-ev{font-size:12.5px;font-weight:800;font-family:Consolas,Menlo,monospace;color:var(--acc-t);
+  padding:1px 8px;border-radius:6px;background:var(--acc-soft)}
+.tl-item.done .tl-ev{color:var(--green);background:var(--green-bg)}
+.tl-ms{font-size:11px;color:var(--t4);font-family:Consolas,Menlo,monospace;white-space:nowrap}
+.tl-desc{font-size:12px;color:var(--t2);margin-top:3px;line-height:1.55;word-break:break-all}
+.tl-desc code{font-family:Consolas,Menlo,monospace;font-size:11.5px;color:var(--t2)}
+
+/* 工具调用列表 */
+.tools .tool{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:var(--radius-s,12px);
+  background:var(--hl);border:1px solid var(--line2);margin-bottom:6px;font-size:12px}
+.tools .tool .tms{font-family:Consolas,Menlo,monospace;color:var(--t4);font-size:11px;flex:none}
+.tools .tool .tname{font-weight:700;color:var(--acc-t);word-break:break-all}
+
+/* stdout 折叠流 */
+details.streambox{border:1px solid var(--line2);border-radius:var(--radius-s,12px);background:var(--hl);margin-top:8px}
+details.streambox summary{cursor:pointer;padding:10px 14px;font-size:13px;font-weight:700;color:var(--t2);
+  user-select:none;list-style:none;display:flex;align-items:center;gap:8px}
+details.streambox summary::before{content:"▸";transition:transform .15s;color:var(--t4)}
+details.streambox[open] summary::before{transform:rotate(90deg)}
+.stream-pre{max-height:420px;overflow:auto;padding:12px 14px;margin:0;
+  font-family:Consolas,Menlo,"Courier New",monospace;font-size:11.5px;line-height:1.65;color:var(--t2);
+  white-space:pre-wrap;word-break:break-all;border-top:1px solid var(--line2)}
+/* 隐私高亮：红橙底但不遮蔽内容 */
+.pv{color:var(--priv);background:var(--priv-bg);border-radius:3px;padding:0 3px;font-weight:700}
+.stream-pre .ln{display:block}
+.stream-pre .ln.priv{color:var(--priv);background:var(--priv-bg);border-radius:4px;padding:1px 4px;margin:0 -4px}
+footer{margin-top:18px;text-align:center;color:var(--t4);font-size:11.5px}
+.refresh{position:fixed;right:22px;bottom:22px;width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:20px;
+  box-shadow:0 8px 24px var(--acc-glow);transition:transform .15s;z-index:9}
+.refresh:hover{transform:scale(1.08)}
+.refresh:active{transform:scale(.94)}
+@media(max-width:900px){.main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">📡</div>
+    <div>
+      <h1>运行实况 · 派发中心三级页</h1>
+      <div class="sub">dispatch.py log_live → dispatch_live/*.jsonl · 1.5s 轮询实时观测</div>
+    </div>
+    <div class="pill"><span class="dot" id="liveDot"></span><span id="liveText">读取中…</span></div>
+  </header>
+
+  <a class="back" href="/dispatch">← 返回派发中心</a>
+
+  <div class="main">
+    <div class="card">
+      <h2>任务列表 <span style="font-size:12px;color:var(--t4);font-weight:400" id="taskCount"></span></h2>
+      <div id="taskList"></div>
+      <div class="empty" id="taskEmpty" style="display:none">暂无运行实况 —— 派发任务后 1.5s 内出现</div>
+    </div>
+
+    <div class="card">
+      <div id="detailBox">
+        <div class="empty" style="padding:60px 0">← 左栏选择任务查看执行时间线</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>api_gateway :3100 · /dispatch/live · dispatch_live/*.jsonl</footer>
+</div>
+<button class="refresh" title="刷新" onclick="loadList(true)">↻</button>
+
+<script>
+const $=id=>document.getElementById(id);
+let selected=null;          // 当前选中 task_id
+let stdoutOpen=false;       // stdout 折叠面板展开态（轮询时保持）
+const PRIV_RE=/(sk-[A-Za-z0-9_-]{6,}|Bearer\s+[A-Za-z0-9._-]+|token=[^\s&"']+|api_key[=:][^\s&"']+)/i;
+
+function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function fmtDur(ms){
+  if(ms==null)return '';
+  if(ms<1000)return ms+'ms';
+  if(ms<60000)return (ms/1000).toFixed(1)+'s';
+  return Math.floor(ms/60000)+'m'+Math.round(ms%60000/1000)+'s';
+}
+function fmtSize(b){
+  if(!b)return '0B';
+  if(b<1024)return b+'B';
+  if(b<1048576)return (b/1024).toFixed(1)+'KB';
+  return (b/1048576).toFixed(2)+'MB';
+}
+function statusBadge(t){
+  if(t.status==='running')return '<span class="live-tag">● LIVE</span>';
+  return t.ok?'<span class="badge ok">✓ 成功 '+fmtDur(t.duration_ms)+'</span>'
+             :'<span class="badge err">✗ exit='+t.exit_code+' · '+fmtDur(t.duration_ms)+'</span>';
+}
+
+async function loadList(manual){
+  try{
+    const r=await fetch('/api/dispatch/live/list');
+    const d=await r.json();
+    $('liveDot').className='dot on';
+    $('liveText').textContent='已连接 · '+d.time+' · '+d.count+' 个任务';
+    const tasks=(d.tasks||[]).slice(0,8);   // 最多 8 个（start_ts 倒序由后端保证）
+    $('taskCount').textContent=tasks.length?('（最近 '+tasks.length+'）'):'';
+    $('taskEmpty').style.display=tasks.length?'none':'block';
+    $('taskList').innerHTML=tasks.map(t=>`
+      <div class="titem ${t.task_id===selected?'sel':''}" onclick="selectTask('${t.task_id}')">
+        <div class="row1">
+          ${t.status==='running'?'<span class="breath"></span>':''}
+          <span class="tid">${t.task_id}</span>
+          <span class="ttime">${t.start_time||''}</span>
+        </div>
+        <div class="row2">
+          <span class="tbadge t${t.tier||'A'}">${t.tier||'-'}</span>
+          <span>${esc(t.via||'')}</span>
+          ${t.status==='running'?'<span class="live-tag" style="margin-left:auto">LIVE</span>':statusBadge(t)}
+        </div>
+        <div class="tprompt">${esc((t.prompt||'').slice(0,80))}</div>
+      </div>`).join('');
+    // 自动选中：未选 / 选中项已消失 → 选最新
+    if(!selected||!tasks.some(t=>t.task_id===selected)){
+      if(tasks.length){selected=tasks[0].task_id;loadList();return;}
+      else{$('detailBox').innerHTML='<div class="empty" style="padding:60px 0">← 左栏选择任务查看执行时间线</div>';}
+    }else if(selected){
+      loadTask(selected);
+    }
+  }catch(e){
+    $('liveDot').className='dot';
+    $('liveText').textContent='读取失败';
+  }
+}
+
+async function loadTask(tid){
+  try{
+    const r=await fetch('/api/dispatch/live/'+encodeURIComponent(tid));
+    if(!r.ok)return;
+    const d=await r.json();
+    renderDetail(tid,d.events||[]);
+  }catch(e){}
+}
+
+function renderDetail(tid,evs){
+  if(!evs.length)return;
+  const start=evs[0];
+  const t0=start.ts||0;
+  const stdoutText=evs.filter(e=>e.event==='stream').map(e=>e.text||'').join('');
+  const stdoutBytes=evs.filter(e=>e.event==='stream').reduce((a,e)=>a+(e.bytes||0),0);
+  const doneEv=evs.find(e=>e.event==='done');
+
+  // 时间线：start/exec/done 节点 + 连续 stream 聚合为一个节点
+  const nodes=[];
+  let cur=null;
+  for(const e of evs){
+    if(e.event==='stream'){
+      if(cur&&cur.ev==='stream'){cur.n++;cur.bytes+=e.bytes||0;cur.lastTs=e.ts;}
+      else{cur={ev:'stream',n:1,bytes:e.bytes||0,ts:e.ts,lastTs:e.ts};nodes.push(cur);}
+    }else{
+      cur=null;nodes.push(e);
+    }
+  }
+  const tlHtml=nodes.map(n=>{
+    const ms=n.lastTs!=null?Math.max(0,Math.round((n.lastTs-t0)*1000)):Math.max(0,Math.round((n.ts-t0)*1000));
+    let desc='';
+    if(n.event==='start')desc='tier=<code>'+esc(n.tier)+'</code> via=<code>'+esc(n.via)+'</code>'+(n.paid?' · <b style="color:var(--orange)">付费</b>':'');
+    else if(n.event==='exec')desc=n.pid?('pid=<code>'+n.pid+'</code> · '+(n.cmd?'<code>'+esc(n.cmd.join(' '))+'</code>':'')):esc(n.error||n.note||'');
+    else if(n.event==='stream')desc='stdout ×'+n.n+' 增量 · '+fmtSize(n.bytes);
+    else if(n.event==='done')desc='exit_code=<code>'+n.exit_code+'</code> · '+(n.ok?'成功':'失败')+' · 耗时 <code>'+fmtDur(n.duration_ms)+'</code>';
+    const cls=n.event==='done'?'done':(n.event==='stream'?'stream':'');
+    return `<div class="tl-item ${cls}">
+      <div class="tl-head"><span class="tl-ev">${esc(n.event)}</span><span class="tl-ms">+${ms}ms</span></div>
+      <div class="tl-desc">${desc}</div>
+    </div>`;
+  }).join('');
+
+  // 工具调用启发式：从 stdout 行提取工具痕迹（工具名/调用关键词）
+  const tools=[];
+  (stdoutText.split('\n')||[]).forEach((ln,i)=>{
+    if(!ln) return;
+    const m=ln.match(/(?:🔧|tool[_ ]?call|调用工具|function[_ ]?call|Execut(?:e|ing)\s+(?:tool|function|command))\s*[:：]?\s*(.{1,120})/i);
+    if(m){
+      tools.push({ms:'+',name:ln.trim().slice(0,160)});
+    }
+  });
+  const toolHtml=tools.length
+    ?tools.slice(0,30).map(t=>`<div class="tool"><span class="tms">🔧</span><span class="tname">${esc(t.name)}</span></div>`).join('')
+    :'<div class="empty" style="padding:12px 0">stdout 中未识别到工具调用痕迹</div>';
+
+  // stdout 流：按行渲染 + 隐私高亮（红橙，内容不遮蔽）
+  const lines=stdoutText.split('\n');
+  const streamHtml=lines.map(ln=>{
+    const cls=PRIV_RE.test(ln)?'ln priv':'ln';
+    const h=esc(ln).replace(/(sk-[A-Za-z0-9_-]{6,}|Bearer\s+[A-Za-z0-9._-]+|token=[^\s&"']+|api_key[=:][^\s&"']+)/gi,'<span class="pv">$1</span>');
+    return `<span class="${cls}">${h||' '}</span>`;
+  }).join('');
+
+  const running=!doneEv;
+  $('detailBox').innerHTML=`
+    <div class="detail-head">
+      ${running?'<span class="breath"></span>':''}
+      <span class="dtid">${esc(tid)}</span>
+      <span class="tbadge t${start.tier||'A'}">${start.tier||'-'}</span>
+      <span style="font-size:12.5px;color:var(--t3)">${esc(start.via||'')}</span>
+      ${running?'<span class="live-tag">● LIVE</span>':(doneEv.ok?'<span class="badge ok">✓ 成功</span>':'<span class="badge err">✗ exit='+(doneEv.exit_code??'?')+'</span>')}
+      ${doneEv?'<span style="font-size:12px;color:var(--t4)">'+fmtDur(doneEv.duration_ms)+'</span>':''}
+    </div>
+    <div class="meta-line">start_ts=<span style="font-family:Consolas,monospace">${start.ts||''}</span> · stdout ${fmtSize(stdoutBytes)} · ${nodes.length} 个时间线节点${running?' · 运行中…':''}</div>
+    <div class="prompt-box">${esc(start.prompt||'')}</div>
+    <h2 style="font-size:14px">时间线</h2>
+    <div class="tl">${tlHtml}</div>
+    <h2 style="font-size:14px;margin-top:16px">工具调用</h2>
+    <div class="tools">${toolHtml}</div>
+    <h2 style="font-size:14px;margin-top:16px">stdout 流</h2>
+    <details class="streambox" ${stdoutOpen?'open':''} ontoggle="stdoutOpen=this.open">
+      <summary>📦 stdout · ${fmtSize(stdoutBytes)} · ${lines.length} 行（点击展开/收起）</summary>
+      <pre class="stream-pre">${streamHtml}</pre>
+    </details>`;
+}
+
+function selectTask(tid){selected=tid;loadList();loadTask(tid);}
+loadList();
+setInterval(loadList,1500);   // 1.5s 轮询列表 + 当前选中任务
+</script>
+</body>
+</html>

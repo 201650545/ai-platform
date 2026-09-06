@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-B站视频嵌入组件测试 (06_组件编排器/components/video_embed_bilibili.py)
+B站视频嵌入组件测试 (apps/component-orchestrator/components/video_embed_bilibili.py)
 覆盖：BV 正则、儿童内容排序、build_iframe 模板、validate_bv、run 契约、search。
 网络部分（B站/网关）内置 SKIP 保护：站点风控或不可达时不判失败。
 """
@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "apps", "component-orchestrator"))
 sys.path.insert(0, BASE)
 if os.path.isdir(ORCH_DIR):
     sys.path.insert(0, ORCH_DIR)

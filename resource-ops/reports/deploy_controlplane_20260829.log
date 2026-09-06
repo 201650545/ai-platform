@@ -1,7 +1,0 @@
-﻿==== deploy start 2026-08-29 12:20:51 ====
-A. nssm install done
-A. service status=Running
-B. watchdog task registered: Ready
-==== deploy done ====
-==== deploy2 start 2026-08-29 17:39:14 ====
-==== deploy2 start 2026-08-29 17:39:20 ====

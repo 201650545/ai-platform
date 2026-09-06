@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "06_组件编排器"))
+ORCH_DIR = os.path.normpath(os.path.join(BASE, "..", "apps", "component-orchestrator"))
 sys.path.insert(0, BASE)
 if os.path.isdir(ORCH_DIR):
     sys.path.insert(0, ORCH_DIR)

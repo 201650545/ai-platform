@@ -12,14 +12,20 @@ task_board: docs/01-任务看板.md
   来源仓映射见 docs/migration/path-map.md。
 
 modules:
-  - path: ./
-    desc: 平台主干（网关/搜索/GitHub管理/飞书同步）
+  - path: apps/central-platform/
+    desc: 中央平台（原 00_中央平台）：认证/资源桥/GitHub 管理/飞书同步
+  - path: apps/search-gateway/
+    desc: AI 搜索网关（并入自 ai-hub）：核心服务 + MCP 封装 + Web 页面
+  - path: apps/component-orchestrator/
+    desc: 组件编排器（原 06_组件编排器）：图片组件/视频嵌入/画布/课时框架
   - path: resource-ops/
     desc: AI 自助资源运营体系
   - path: integrations/feishu/
     desc: 飞书多维表格导出（GitHub Pages 管线）
   - path: agent/memory/
     desc: 记忆协议文档（运行数据仍在原仓 ai-hub-memory）
+  - path: jobs/modelscope-daily/
+    desc: 模型每日同步定时任务
 
 migration: docs/migration/path-map.md
 

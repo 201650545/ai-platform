@@ -21,7 +21,8 @@ import yaml
 
 _NODE = "D:/Program Files/nodejs/node.exe"
 _OPENCLI_SCRIPT = "C:/Users/郭永涛/AppData/Roaming/npm/node_modules/@jackwener/opencli/dist/src/main.js"
-RULE_CARD_DIR = r"d:\项目\06_组件编排器\组件规则卡"
+_ORCH_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RULE_CARD_DIR = os.path.join(_ORCH_ROOT, "组件规则卡")
 
 def run_cli(args, timeout=90):
     """底层 opencli 执行器"""
@@ -399,7 +400,7 @@ if __name__ == "__main__":
         "mode": "download"
     }
     card_p = os.path.join(RULE_CARD_DIR, "image_gen_zhipu.yaml")
-    target_dir = r"d:\项目\06_组件编排器\components\test_output"
+    target_dir = os.path.join(_ORCH_ROOT, "components", "test_output")
     print("Testing image_gen.py adapter...")
     res = run(test_slot, card_p, target_dir)
     print("Run Result:", json.dumps(res, ensure_ascii=False, indent=2))

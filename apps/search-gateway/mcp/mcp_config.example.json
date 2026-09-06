@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ai-search-gateway": {
+      "command": "python",
+      "args": ["<REPO_ROOT>/apps/search-gateway/mcp/search_mcp_server.py"],
+      "cwd": "<REPO_ROOT>/apps/search-gateway/mcp",
+      "env": {
+        "SEARCH_GATEWAY_BASE": "http://127.0.0.1:3000"
+      }
+    }
+  }
+}

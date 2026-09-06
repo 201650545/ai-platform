@@ -5,18 +5,20 @@ name: "Validate"
 on:
   pull_request:
     paths:
-      - "config/**"
-      - "scripts/**"
-      - "lib/**"
-      - "integrations/feishu/.github/workflows/validate.yml"
+      - "integrations/feishu/config/**"
+      - "integrations/feishu/scripts/**"
+      - "integrations/feishu/lib/**"
+      - "integrations/feishu/package*.json"
+      - ".github/workflows/feishu-validate.yml"
   push:
     branches:
       - main
     paths:
-      - "config/**"
-      - "scripts/**"
-      - "lib/**"
-      - "integrations/feishu/.github/workflows/validate.yml"
+      - "integrations/feishu/config/**"
+      - "integrations/feishu/scripts/**"
+      - "integrations/feishu/lib/**"
+      - "integrations/feishu/package*.json"
+      - ".github/workflows/feishu-validate.yml"
   workflow_dispatch:
 
 permissions:
