@@ -79,8 +79,14 @@ def fallback_enabled(alias):
 
 # ---------------------------------------------------------------- ③ 渠道状态
 def registry():
-    """channel_registry.json：{ channel_id: {enabled, credential_status, last_success, quota, health} }。"""
-    return _load("registry")
+    """channel_registry.json：{ channel_id: {enabled, credential_status, last_success, quota, health} }。
+
+    文件带 schema_version/generated_at/note 头，渠道在 channels 子键下；拆包返回 {channel_id:...}。
+    """
+    d = _load("registry")
+    if isinstance(d, dict) and isinstance(d.get("channels"), dict):
+        return d["channels"]
+    return d
 
 
 def channel_state(channel_id):
