@@ -23,17 +23,17 @@ curl -s http://localhost:8000/api/stats >nul 2>&1
 if %errorlevel%==0 (
     echo      中央平台已在运行
 ) else (
-    start /min "ai-hub-central" python "D:\项目\00_中央平台\server.py"
+    start /min "ai-hub-central" python "D:\项目\services\central\server.py"
     timeout /t 3 /nobreak >nul
 )
 
-REM 3. 启动网关 ds_v4_cli :3000
-echo [3/4] 启动网关 ds_v4_cli :3000...
-curl -s http://localhost:3000/api/health >nul 2>&1
+REM 3. 启动组件编排器 :8791
+echo [3/4] 启动组件编排器 :8791...
+curl -s http://localhost:8791/health >nul 2>&1
 if %errorlevel%==0 (
-    echo      网关已在运行
+    echo      组件编排器已在运行
 ) else (
-    start /min "ai-hub-gateway" python "D:\项目\02_网关实例\ds_v4_cli\unified_gateway.py"
+    start /min "ai-hub-orchestrator" python "D:\项目\services\orchestrator\canvas_server.py" --serve-only
     timeout /t 5 /nobreak >nul
 )
 
@@ -46,7 +46,8 @@ echo ========================================
 echo   启动完成！
 echo   中央导航: http://localhost:8000
 echo   管理面板: http://localhost:8000/dashboard/index.html
-echo   搜索网关: http://localhost:3000
+echo   组件编排器: http://localhost:8791
+echo   搜索网关: http://localhost:3000  (需经 runtime.cli 启停)
 echo ========================================
 echo.
 set /p OPEN=是否打开中央导航页面？(Y/N)

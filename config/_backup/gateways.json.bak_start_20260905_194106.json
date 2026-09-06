@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "updated_at": "2026-09-05",
+  "_comment": "纯声明式配置真源。PID/监听/health/online 等运行态一律不写在此，由 inspect_gateways.ps1 探测生成 gateway_runtime.json / gateway_drift.json。",
+  "gateways": {
+    "central": {
+      "name": "中央平台 central",
+      "kind": "platform",
+      "role": "中央管理/入口平台",
+      "lifecycle": "active",
+      "desired_state": "started",
+      "canonical_path": "D:\\项目\\services\\central",
+      "canonical_status": "confirmed",
+      "process": {
+        "entrypoint": "server.py",
+        "command_match": ["server.py"]
+      },
+      "network": {
+        "host": "127.0.0.1",
+        "port": 8000
+      },
+      "healthcheck": {
+        "url": "http://127.0.0.1:8000/api/stats",
+        "timeout_sec": 2,
+        "startup_grace_sec": 15
+      }
+    },
+    "orchestrator": {
+      "name": "组件编排器 orchestrator",
+      "kind": "orchestrator",
+      "role": "Agent/组件编排",
+      "lifecycle": "active",
+      "desired_state": "started",
+      "canonical_path": "D:\\项目\\services\\orchestrator",
+      "canonical_status": "confirmed",
+      "process": {
+        "entrypoint": "canvas_server.py",
+        "command_match": ["canvas_server.py", "--serve-only"]
+      },
+      "network": {
+        "host": "127.0.0.1",
+        "port": 8791
+      },
+      "healthcheck": {
+        "url": "http://127.0.0.1:8791/health",
+        "timeout_sec": 2,
+        "startup_grace_sec": 15
+      }
+    },
+    "search_gateway": {
+      "name": "搜索网关 search_gateway",
+      "kind": "gateway",
+      "role": "Search(3000) + OpenAI兼容API转发(3100)",
+      "lifecycle": "active",
+      "desired_state": "stopped",
+      "canonical_path": "D:\\项目\\ai-hub\\search_gateway\\services",
+      "process": {
+        "entrypoint": "api_gateway.py",
+        "command_match": ["api_gateway.py"]
+      },
+      "network": {
+        "host": "127.0.0.1",
+        "port": 3100
+      },
+      "healthcheck": {
+        "url": "http://127.0.0.1:3100/api/health",
+        "timeout_sec": 2,
+        "startup_grace_sec": 15
+      }
+    },
+    "ds_v4_cli": {
+      "name": "智能聚合网关 DS V4 CLI",
+      "kind": "cli",
+      "role": "AI搜索+LLM聚合CLI网关",
+      "lifecycle": "legacy",
+      "desired_state": "stopped",
+      "canonical_path": "D:\\游戏\\ds_v4_cli",
+      "process": {
+        "entrypoint": null,
+        "command_match": []
+      },
+      "network": null,
+      "healthcheck": null
+    }
+  }
+}

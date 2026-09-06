@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>渠道测速 · 每日速度报告</title>
+<link rel="icon" type="image/png" href="/img/brand/favicon.png">
+<script>
+(function(){
+ try{
+  var t=localStorage.getItem('gw-theme');
+  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+ }catch(e){document.documentElement.setAttribute('data-theme','light');}
+})();
+</script>
+<style>
+:root{
+  --accent:#0a84ff;
+  --acc-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --bg1:#eef1f8; --bg2:#e4e9f4;
+  --glass:rgba(255,255,255,.52); --gborder:rgba(255,255,255,.66);
+  --t:#1d1d1f; --t2:#55555c; --t3:#7a7a82;
+  --line:rgba(29,29,31,.14);
+  --green:#1fa54f; --green-bg:rgba(48,209,88,.17);
+  --orange:#c97400; --orange-bg:rgba(255,159,10,.18);
+  --red:#e0332a; --red-bg:rgba(255,59,48,.13);
+}
+:root[data-theme="dark"]{
+  --bg1:#0d1117; --bg2:#0a0e14;
+  --glass:rgba(255,255,255,.05); --gborder:rgba(255,255,255,.1);
+  --t:#f2f4f8; --t2:#b0b6c0; --t3:#7d8490;
+  --line:rgba(255,255,255,.14);
+  --green:#4cd37f; --green-bg:rgba(48,209,88,.12);
+  --orange:#f0a53a; --orange-bg:rgba(255,159,10,.14);
+  --red:#ff6b61; --red-bg:rgba(255,59,48,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  min-height:100vh; font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  color:var(--t); padding:28px 20px 60px;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+}
+.wrap{max-width:1080px;margin:0 auto}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+h1{font-size:24px;font-weight:700;letter-spacing:.5px}
+.sub{color:var(--t3);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0}
+.card{
+  background:var(--glass); border:1px solid var(--gborder); border-radius:16px;
+  padding:14px 16px; backdrop-filter:blur(20px);
+}
+.card .k{font-size:12px;color:var(--t3);margin-bottom:6px}
+.card .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .v small{font-size:12px;color:var(--t3);font-weight:400}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{
+  text-align:left;padding:9px 10px;color:var(--t3);font-weight:600;font-size:12px;
+  border-bottom:1px solid var(--line);white-space:nowrap
+}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:9px 10px;border-bottom:1px solid var(--line)}
+tr.group-row td{
+  background:var(--acc-soft);font-weight:700;font-size:12.5px;color:var(--t);
+  letter-spacing:.5px;padding-top:12px
+}
+.chip{
+  display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600
+}
+.c-ok{background:var(--green-bg);color:var(--green)}
+.c-fail{background:var(--red-bg);color:var(--red)}
+.tok-bar{
+  display:inline-block;height:8px;border-radius:4px;background:var(--accent);
+  vertical-align:middle;margin-left:8px;opacity:.75
+}
+.err{color:var(--t3);font-size:12px;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.glass{
+  background:var(--glass);border:1px solid var(--gborder);border-radius:16px;
+  backdrop-filter:blur(20px);overflow:hidden
+}
+.glass .tbl-scroll{overflow-x:auto}
+.sec-title{font-size:16px;font-weight:700;margin:26px 0 10px;display:flex;align-items:baseline;gap:10px}
+.sec-title .sub{font-weight:400}
+footer{margin-top:30px;color:var(--t3);font-size:12px;text-align:center}
+a{color:var(--accent);text-decoration:none}
+.empty{padding:40px;text-align:center;color:var(--t3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>⚡ 渠道测速</h1>
+    <span class="sub" id="meta">加载中…</span>
+    <span style="flex:1"></span>
+    <a href="/api_page.html" class="sub">← 网关控制台</a>
+  </header>
+  <div class="cards" id="cards"></div>
+
+  <div class="sec-title">当日快照 <span class="sub">按编排组聚类 · tok/s 为非流式吞吐 · TTFT 为流式首包</span></div>
+  <div class="glass"><div class="tbl-scroll"><table id="tbl">
+    <thead><tr>
+      <th>渠道 / 模型</th><th>所属编排组</th><th>状态</th>
+      <th class="num">tok/s</th><th class="num">吞吐</th>
+      <th class="num">TTFT</th><th class="num">总耗时</th><th>备注</th>
+    </tr></thead>
+    <tbody id="rows"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+  </table></div></div>
+
+  <div class="sec-title">近 7 天趋势 <span class="sub">每日 tok/s</span></div>
+  <div class="glass"><div class="tbl-scroll"><table id="trend">
+    <thead><tr><th>渠道 / 模型</th><th>7 天每日 tok/s</th></tr></thead>
+    <tbody id="trend-rows"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody>
+  </table></div></div>
+
+  <footer>数据来源 D:\项目\data\search_gateway\speed_tests\ · 计划任务 GatewaySpeedTestDaily 每天 00:05 运行 · <a href="/speed">刷新</a></footer>
+</div>
+<script>
+(function(){
+ var MAX_TOK = 80; // 吞吐条的最大 tok/s 标尺
+ function fmt(n){return n==null?'—':(typeof n==='number'?n.toFixed(1):n)}
+ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+
+ fetch('/api/speed/test').then(r=>r.json()).then(d=>{
+   var snap=d.today||{}; var results=snap.results||[];
+   document.getElementById('meta').textContent =
+     (snap.generated_at?('生成于 '+snap.generated_at):'今日尚无快照（每天 00:05 自动运行）')
+     + ' · max_tokens='+ (snap.max_tokens||'—');
+
+   var ok=results.filter(r=>r.ok), fails=results.filter(r=>!r.ok);
+   var toks=ok.map(r=>r.tok_s).filter(x=>x!=null);
+   var best=toks.length?Math.max.apply(null,toks):null;
+   var avg=toks.length?toks.reduce((a,b)=>a+b,0)/toks.length:null;
+   document.getElementById('cards').innerHTML=
+     card('测试渠道/模型对', results.length) +
+     card('成功 <small>/ 失败</small>', ok.length+' <small>/ '+fails.length+'</small>') +
+     card('平均吞吐', avg?fmt(avg)+' <small>tok/s</small>':'—') +
+     card('最快渠道', best?fmt(best)+' <small>tok/s</small>':'—');
+
+   // 按组聚类行：每组一个组行 + 其成员
+   var byGroup={};
+   results.forEach(r=>(r.groups||[]).forEach(g=>{(byGroup[g]=byGroup[g]||[]).push(r)}));
+   // 出现于多组的只挂第一组，避免重复行
+   var seen={}, html='';
+   Object.keys(byGroup).sort().forEach(g=>{
+     html+='<tr class="group-row"><td colspan="8">▣ '+esc(g)+'</td></tr>';
+     byGroup[g].forEach(r=>{
+       if(seen[r.channel+'|'+r.model])return; seen[r.channel+'|'+r.model]=1;
+       html+=row(r);
+     });
+   });
+   document.getElementById('rows').innerHTML=html||'<tr><td colspan="8" class="empty">今日暂无数据</td></tr>';
+
+   // 趋势
+   var trend=d.trend||{}, thtml='';
+   Object.keys(trend).sort().forEach(k=>{
+     var days=trend[k];
+     var cells=days.map(dd=>{
+       if(!dd.ok)return '<span style="color:var(--red)">✕</span>';
+       var t=dd.tok_s; if(t==null)return '<span style="color:var(--t3)">·</span>';
+       var h=Math.max(4,Math.round(t/MAX_TOK*22));
+       return '<span title="'+dd.date+' '+t+' tok/s" style="display:inline-block;width:7px;height:'+h+
+              'px;background:var(--accent);border-radius:2px;margin-right:3px;vertical-align:bottom;opacity:.85"></span>';
+     }).join('');
+     thtml+='<tr><td style="white-space:nowrap">'+esc(k.replace('|',' · '))+'</td><td>'+cells+'</td></tr>';
+   });
+   document.getElementById('trend-rows').innerHTML=thtml||'<tr><td colspan="2" class="empty">趋势数据累积中（明天起有 2 天以上）</td></tr>';
+ }).catch(e=>{
+   document.getElementById('rows').innerHTML='<tr><td colspan="8" class="empty">加载失败：'+esc(e)+'</td></tr>';
+ });
+
+ function card(k,v){return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'}
+ function row(r){
+   var status=r.ok?'<span class="chip c-ok">OK</span>':'<span class="chip c-fail">FAIL</span>';
+   var tok=r.tok_s==null?'—':r.tok_s;
+   var bar=r.tok_s==null?'':'<span class="tok-bar" style="width:'+Math.max(4,Math.round(r.tok_s/MAX_TOK*80))+'px"></span>';
+   return '<tr>'+
+     '<td style="white-space:nowrap"><b>'+esc(r.channel)+'</b><br><span style="color:var(--t3);font-size:12px">'+esc(r.model)+'</span></td>'+
+     '<td style="color:var(--t3);font-size:12px">'+esc((r.groups||[]).join('、'))+'</td>'+
+     '<td>'+status+'</td>'+
+     '<td class="num"><b>'+tok+'</b>'+bar+'</td>'+
+     '<td class="num">'+fmt(r.completion_tokens)+' <small style="color:var(--t3)">tok</small></td>'+
+     '<td class="num">'+fmt(r.ttft_s)+'s</td>'+
+     '<td class="num">'+fmt(r.total_s)+'s</td>'+
+     '<td class="err" title="'+esc(r.error)+'">'+esc(r.error||'')+'</td>'+
+   '</tr>';
+ }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "gateways": {
+    "ds_v4_cli": {
+      "name": "智能聚合网关 DS V4 CLI",
+      "icon": "🤖",
+      "description": "AI 搜索 + LLM 聚合网关",
+      "port": 3000,
+      "url": "http://localhost:3000",
+      "status": "online",
+      "created_at": "2026-08-06T00:00:00",
+      "last_seen": "2026-08-19T08:04:23"
+    },
+    "search_gateway": {
+      "name": "搜索网关 search_gateway",
+      "icon": "🔀",
+      "description": "OpenAI 兼容 API 转发网关（3100）+ 搜索网关（3000）；子项目，三拆配置管理",
+      "port": 3100,
+      "ports": [3000, 3100],
+      "url": "http://localhost:3100",
+      "status": "online",
+      "created_at": "2026-09-05T00:00:00",
+      "last_seen": "2026-09-05T00:00:00"
+    }
+  }
+}
