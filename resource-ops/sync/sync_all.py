@@ -58,6 +58,24 @@ def _resolve_paths(cfg):
     return cfg
 
 
+# 工具级本地环境（gitignored）：本机机器路径固化在 sync_local.env，
+# 不依赖全局 User Env（常驻宿主派生的进程读不到 setx 的改动，这类进程在本机常见）。
+_LOCAL_ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync_local.env")
+
+
+def _load_local_env():
+    """读取工具目录下 sync_local.env（KEY=VALUE，支持 # 注释与引号），只填补缺失的环境变量。"""
+    if not os.path.exists(_LOCAL_ENV_PATH):
+        return
+    with open(_LOCAL_ENV_PATH, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
 def run(cmd, cwd=None, env=None):
     """执行命令，返回 (returncode, stdout, stderr)。"""
     e = dict(os.environ)
@@ -196,6 +214,7 @@ def main():
     ap.add_argument("--no-log", action="store_true", help="不写同步日志")
     args = ap.parse_args()
 
+    _load_local_env()
     cfg = _resolve_paths(load_config())
     patterns = cfg.get("secret_scan", {}).get("patterns", [])
     only = set(args.repo)
