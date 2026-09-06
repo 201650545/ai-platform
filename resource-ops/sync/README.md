@@ -9,7 +9,7 @@
 
 | 变量 | 用途 | 示例 |
 |------|------|------|
-| `AI_PLATFORM_ROOT` | ai-platform 主仓本地路径 | `D:\AI平台` |
+| `AI_PLATFORM_ROOT` | ai-platform 主仓本地路径 | `D:\Work\AI平台` |
 | `FEISHU_DATA_HUB_ROOT` | 学习英语数据桥仓库路径 | `D:\项目\feishu-data-hub` |
 | `AI_HUB_MEMORY_ROOT` | 多 Agent 共享记忆仓库路径 | `D:\项目\ai-hub-memory` |
 | `AI_HUB_MONOREPO_ROOT` | 逆天主题单仓路径（默认禁用） | `D:\项目` |
@@ -18,7 +18,7 @@
 
 设置示例（PowerShell 每次运行前，或写入 Agent 环境）：
 ```powershell
-$env:AI_PLATFORM_ROOT = 'D:\AI平台'
+$env:AI_PLATFORM_ROOT = 'D:\Work\AI平台'
 $env:FEISHU_DATA_HUB_ROOT = 'D:\项目\feishu-data-hub'
 $env:AI_HUB_MEMORY_ROOT = 'D:\项目\ai-hub-memory'
 $env:AI_HUB_MONOREPO_ROOT = 'D:\项目'
