@@ -64,8 +64,9 @@ Agent 或维护者修改 search_gateway 前按顺序阅读：
 1. 本文
 2. `02-search_gateway-配置与路由规范.md`
 3. `ADR/ADR-002-配置三拆与显式备用链.md`
-4. 当前相关任务卡
-5. 对应代码
+4. `ADR/ADR-003-统一模型名聚合同模多渠道成员池.md`
+5. 当前相关任务卡
+6. 对应代码
 
 涉及运行拓扑时追加：
 `01-search_gateway-架构与运行.md`
@@ -77,6 +78,7 @@ Agent 或维护者修改 search_gateway 前按顺序阅读：
 
 - `ADR/ADR-001-迁入-ai-platform-作为子项目`
 - `ADR/ADR-002-配置三拆与显式备用链`
+- `ADR/ADR-003-统一模型名聚合同模多渠道成员池`
 
 ## 7. 当前任务
 
