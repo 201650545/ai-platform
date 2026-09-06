@@ -17,7 +17,12 @@ status: active
 | 3100 | OpenAI 兼容 API 转发网关 | HTTP | 网关对外服务入口（已确认） |
 | 3000 | 搜索网关 | HTTP | 另一套搜索服务，含历史记录（已确认） |
 
-待核实项：3100 的具体入口进程、上游调用方、暴露范围；3000 的进程入口与下游。以实际启动代码 / 配置为准。
+**运行形态定案（已确认）**：本服务为**常驻 HTTP 网关**，非内嵌库、非一次性 CLI/脚本。
+- `:3100`（API 转发网关）由 `api_gateway.py` 的 `ThreadedServer.serve_forever()` 常驻启动（Python `http.server` + 多线程），对外 OpenAI 兼容 `/v1/*`，对内聚合多渠道。
+- `:3000`（搜索网关）由 `unified_gateway.py` / `search_gateway.py` 启动，多 Tab 聚合站（含历史记录）。
+- 调用方以 HTTP（Base URL）访问网关，不直接 import 网关内部函数。
+
+待核实项：3100 / 3000 的上游调用方、暴露范围（仅本机 / 局域网）。进程入口已确认（见上）。
 
 ## B. 模块边界
 

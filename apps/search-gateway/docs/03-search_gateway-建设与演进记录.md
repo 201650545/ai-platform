@@ -83,3 +83,18 @@ component: search_gateway
 
 决策：
 `ADR/ADR-003-统一模型名聚合同模多渠道成员池`
+
+---
+
+### 运行形态定案
+
+状态：确认（2026-09-06）
+
+变化：
+- 明确定位：**常驻 HTTP 网关**，非内嵌库、非一次性 CLI
+- `:3100` API 转发网关 = `api_gateway.py` 的 `ThreadedServer.serve_forever()`
+- `:3000` 搜索网关 = `unified_gateway.py` / `search_gateway.py`
+- 调用方走 HTTP（OpenAI 兼容 `/v1` Base URL），不直接 import 网关内部函数
+
+依据：
+- `01-search_gateway-架构与运行.md` 的「运行形态定案」小节（此为该判定的权威定义点）
