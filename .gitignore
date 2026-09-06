@@ -55,3 +55,10 @@ search_gateway/mcp/.venv/
 # 网关运行日志
 search_gateway/**/*.log
 search_gateway/**/*_err.log
+# 测试运行归档 / 调试隔离区 / 错误日志 / 残留备份（归档非源码）
+search_gateway/services/runs/
+search_gateway/services/_debug_quarantine/
+search_gateway/services/logs/
+search_gateway/services/**/*.err
+search_gateway/**/*.bak_*
+search_gateway/services/web/img/
