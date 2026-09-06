@@ -1,32 +1,32 @@
 {
   "schema_version": 1,
-  "description": "三端同步配置：GitHub ↔ 本地 ↔ 飞书。由 sync_all.py 读取执行。",
+  "description": "三端同步配置：GitHub ↔ 本地 ↔ 飞书。由 sync_all.py 读取执行；路径用 ${VAR}/%VAR% 环境占位符，见 README 环境变量表（本机实际路径不入库）。",
 
   "repos": [
     {
       "name": "ai-platform",
-      "path": "D:\\AI平台",
+      "path": "${AI_PLATFORM_ROOT}",
       "branch": "main",
       "enabled": true,
       "note": "AI 单仓平台集成后主仓（resource-ops= 原 ai-resource-hub：方案书/调研/分派指令包/同步脚本）"
     },
     {
       "name": "feishu-data-hub",
-      "path": "D:\\项目\\feishu-data-hub",
+      "path": "${FEISHU_DATA_HUB_ROOT}",
       "branch": "main",
       "enabled": true,
       "note": "学习英语数据桥：飞书 Base → GitHub Pages 公开 JSON"
     },
     {
       "name": "ai-hub-memory",
-      "path": "D:\\项目\\ai-hub-memory",
+      "path": "${AI_HUB_MEMORY_ROOT}",
       "branch": "main",
       "enabled": true,
       "note": "多 Agent 共享记忆仓库"
     },
     {
       "name": "ai-hub-monorepo",
-      "path": "D:\\项目",
+      "path": "${AI_HUB_MONOREPO_ROOT}",
       "branch": "refactor/monorepo-20260812",
       "enabled": false,
       "note": "逆天主题单仓（已挂起）。默认不自动提交，需要时手动开启。"
@@ -36,7 +36,7 @@
   "feishu_exports": [
     {
       "name": "ai-platform resource-ops 公开数据桥",
-      "cwd": "D:\\AI平台\\resource-ops",
+      "cwd": "${AI_PLATFORM_ROOT}/resource-ops",
       "cmd": ["python", "exporter/export.py"],
       "env": ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_BASE_TOKEN"],
       "enabled": true,
@@ -44,7 +44,7 @@
     },
     {
       "name": "feishu-data-hub 学习英语导出",
-      "cwd": "D:\\项目\\feishu-data-hub",
+      "cwd": "${FEISHU_DATA_HUB_ROOT}",
       "cmd": ["node", "scripts/sync.mjs"],
       "env": ["FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_BASE_TOKEN"],
       "enabled": true,

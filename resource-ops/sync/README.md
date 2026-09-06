@@ -3,6 +3,27 @@
 > 用途：把各项目仓库的本地改动统一提交到 GitHub，拉取远端最新，并按需导出飞书数据到本地。
 > 任何 Agent 读本文档即可执行，无需额外解释。
 
+## 环境变量（本机路径不入库）
+
+`sync_config.json` 仓库内的路径使用占位符，运行前需在本机设置实际路径：
+
+| 变量 | 用途 | 示例 |
+|------|------|------|
+| `AI_PLATFORM_ROOT` | ai-platform 主仓本地路径 | `D:\AI平台` |
+| `FEISHU_DATA_HUB_ROOT` | 学习英语数据桥仓库路径 | `D:\项目\feishu-data-hub` |
+| `AI_HUB_MEMORY_ROOT` | 多 Agent 共享记忆仓库路径 | `D:\项目\ai-hub-memory` |
+| `AI_HUB_MONOREPO_ROOT` | 逆天主题单仓路径（默认禁用） | `D:\项目` |
+
+非必要（缺则导出自动跳过）：`FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_BASE_TOKEN`。
+
+设置示例（PowerShell 每次运行前，或写入 Agent 环境）：
+```powershell
+$env:AI_PLATFORM_ROOT = 'D:\AI平台'
+$env:FEISHU_DATA_HUB_ROOT = 'D:\项目\feishu-data-hub'
+$env:AI_HUB_MEMORY_ROOT = 'D:\项目\ai-hub-memory'
+$env:AI_HUB_MONOREPO_ROOT = 'D:\项目'
+```
+
 ## 核心命令
 
 ```bash

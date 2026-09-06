@@ -24,6 +24,9 @@ import re
 import subprocess
 import sys
 
+# 支持 ${VAR} 与 %VAR% 两类环境占位符：sync_config.json 入库用模板（无本机绝对路径）
+_ENV_PAT = re.compile(r"\$\{(\w+)\}|%(\w+)%")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "sync_config.json")
 LOG_PATH = os.path.join(BASE_DIR, "sync_log.md")
@@ -33,6 +36,26 @@ GIT = "git"
 
 def now_str():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _expand(text):
+    """解析 ${VAR}/%VAR% 占位符；变量未设置时保留原文（后续 git 检测会给出清晰失败）。"""
+    if not isinstance(text, str):
+        return text
+    def sub(m):
+        key = m.group(1) or m.group(2)
+        return os.environ.get(key, m.group(0))
+    return _ENV_PAT.sub(sub, text)
+
+
+def _resolve_paths(cfg):
+    for r in cfg.get("repos", []):
+        if isinstance(r.get("path"), str):
+            r["path"] = _expand(r["path"])
+    for e in cfg.get("feishu_exports", []):
+        if isinstance(e.get("cwd"), str):
+            e["cwd"] = _expand(e["cwd"])
+    return cfg
 
 
 def run(cmd, cwd=None, env=None):
@@ -173,7 +196,7 @@ def main():
     ap.add_argument("--no-log", action="store_true", help="不写同步日志")
     args = ap.parse_args()
 
-    cfg = load_config()
+    cfg = _resolve_paths(load_config())
     patterns = cfg.get("secret_scan", {}).get("patterns", [])
     only = set(args.repo)
 

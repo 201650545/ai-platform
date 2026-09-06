@@ -1,0 +1,29 @@
+# Security — 全历史密钥扫描（gitleaks）
+# PR 与 main push 均触发；检出 full history 后对完整 DAG 做 secret scan。
+# 命中真实凭据即失败，阻止合入/推送。不访问生产 secrets。
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks (dir + git)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 公开仓库免费；不写 PR 评论，只作门禁
+          GITLEAKS_ENABLE_COMMENTS: "false"
