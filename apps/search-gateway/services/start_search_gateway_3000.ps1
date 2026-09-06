@@ -2,7 +2,7 @@
 # Called by: Startup folder bat (logon) and watchdog_gateway.bat :3000 branch (auto-heal).
 # WMI Win32_Process.Create parents the process to WmiPrvSE so it survives the
 # caller's session/job closing — the root cause of the gateway dying silently.
-$wd = 'D:\项目\ai-hub\search_gateway\services'
+$wd = $PSScriptRoot
 $py = 'C:\Users\郭永涛\AppData\Local\Programs\Python\Python312\python.exe'
 # guard: engine warmup takes minutes before :3000 binds, so never spawn twice
 $existing = Get-CimInstance Win32_Process -Filter "Name like 'python%'" |

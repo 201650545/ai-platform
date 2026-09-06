@@ -1,7 +1,7 @@
 # start_api_gateway_3100.ps1 — spawn :3100 API forwarding gateway detached.
 # Same pattern as start_search_gateway_3000.ps1: WMI Win32_Process.Create parents to
 # WmiPrvSE so the process survives the caller's session/job closing.
-$wd  = 'D:\项目\ai-hub\search_gateway\services'
+$wd = $PSScriptRoot
 $py  = 'C:\Users\郭永涛\AppData\Local\Programs\Python\Python312\python.exe'
 $existing = Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
     Where-Object { $_.CommandLine -match 'api_gateway\.py' }
