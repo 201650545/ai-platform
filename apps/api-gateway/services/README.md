@@ -26,4 +26,5 @@
 
 ## 主题与文档
 - 前端控制台：`web/api_page.html`
-- 项目专属文档（自包含）：`../docs/api_gateway.md`（服务）、`../docs/主题设置.md`（玄白主题）+ `../docs/玄白_MONO_GATEWAY_预览图.png`
+- 项目专属文档（自包含）：`../docs/api_gateway.md`（服务）、`../docs/主题体系.md`（四主题总览）
+- 四主题：`../docs/主题设置-黑白建筑极简.md`（+预览图）、`../docs/主题设置-云海天舟.md`、`../docs/主题设置-星河枢机.md`、`../docs/主题设置-月夜穹顶.md`（+预览图）

@@ -21,9 +21,13 @@ doc_status: active
 - 入口：`apps/api-gateway/services/api_gateway.py`
 - 前端控制台：`apps/api-gateway/services/web/api_page.html`（已启用 鉴权 + 多主题机制）
 
-## 前端主题
+## 前端主题（四主题体系）
 
-- 主题设置（玄白·黑白建筑极简 / MONO）：`docs/主题设置.md`（预览图 `docs/玄白_MONO_GATEWAY_预览图.png`）
+- 总览：`docs/主题体系.md`（建筑／山海／星河／月夜，已舍弃「归一」）
+- 黑白建筑极简：`docs/主题设置-黑白建筑极简.md` + `docs/预览图-黑白建筑极简.png`
+- 云海天舟 Cloudsea Ark：`docs/主题设置-云海天舟.md`
+- 星河枢机 Celestial Relay：`docs/主题设置-星河枢机.md`
+- 月夜穹顶 Midnight Dome：`docs/主题设置-月夜穹顶.md` + `docs/预览图-月夜穹顶.png`
 
 ## 共享约定（不自包含，跨网关协议）
 - ADR-002 配置三拆与显式备用链、ADR-003 统一模型名聚合同模多渠道成员池：见 `apps/search-gateway/docs/ADR/`（协议级约定，两应用共用，不复制）。
