@@ -26,5 +26,4 @@
 
 ## 主题与文档
 - 前端控制台：`web/api_page.html`
-- 主题设置（玄白·黑白建筑极简）：`docs/设计/AI基础设施/服务/主题设置.md`
-- 服务文档：`docs/设计/AI基础设施/服务/api_gateway.md`
+- 项目专属文档（自包含）：`../docs/api_gateway.md`（服务）、`../docs/主题设置.md`（玄白主题）+ `../docs/玄白_MONO_GATEWAY_预览图.png`

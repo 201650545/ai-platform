@@ -23,4 +23,7 @@ doc_status: active
 
 ## 前端主题
 
-- 主题设置（玄白·黑白建筑极简 / MONO）：`服务/主题设置.md`（预览图 `服务/玄白_MONO_GATEWAY_预览图.png`）
+- 主题设置（玄白·黑白建筑极简 / MONO）：`docs/主题设置.md`（预览图 `docs/玄白_MONO_GATEWAY_预览图.png`）
+
+## 共享约定（不自包含，跨网关协议）
+- ADR-002 配置三拆与显式备用链、ADR-003 统一模型名聚合同模多渠道成员池：见 `apps/search-gateway/docs/ADR/`（协议级约定，两应用共用，不复制）。
