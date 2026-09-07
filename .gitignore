@@ -50,6 +50,12 @@ resource-ops/sync/sync_local.env
 # modelscope-daily 运行日志（不入库，P2-2）
 jobs/modelscope-daily/logs/
 
+# ===== API Gateway 运行时/本地数据（不入库）=====
+apps/api-gateway/data/
+apps/api-gateway/**/logs/
+apps/api-gateway/**/*.log
+apps/api-gateway/**/*_err.log
+
 # ===== Search Gateway 运行时/本地数据（不入库）=====
 apps/search-gateway/data/
 apps/search-gateway/mcp/.venv/
