@@ -47,14 +47,14 @@
 | 016 | [画布观察窗 UI](task_016_画布观察窗UI.md) | P2 | 🟢 Gemini | 可先用 mock 数据开发 | ✅ 完成 |
 | 017 | [生图失败项复验](task_017_生图失败项复验.md) | P1 | 🟢 Gemini | task_015/012 | ⚠️ 已复核；豆包✅智谱✅，Gemini/镜像待人工 |
 
-架构文档：`06_组件编排器/组件编排器架构设计.md`（v1.0，已锁定）
-组件规则卡：`06_组件编排器/组件规则卡/`（4 张初始卡已就位）
+架构文档：`apps/component-orchestrator/组件编排器架构设计.md`（v1.0，已锁定）
+组件规则卡：`apps/component-orchestrator/组件规则卡/`（4 张初始卡已就位）
 注：本阶段执行者仅 🟢 Gemini 与 ⚪ OpenCode 两方，编排器核心已由 DeepSeek 改派 OpenCode。
 
 ## 执行指令
-- 🔵 DeepSeek：`05_执行指令/DeepSeek_V4_Flash_执行指令.md`
-- 🟢 Gemini：`05_执行指令/Gemini_3.6_Flash_执行指令.md`
-- ⚪ OpenCode：`05_执行指令/OpenCode_执行指令.md`
+- 🔵 DeepSeek：`docs/work/execution-instructions/DeepSeek_V4_Flash_执行指令.md`
+- 🟢 Gemini：`docs/work/execution-instructions/Gemini_3.6_Flash_执行指令.md`
+- ⚪ OpenCode：`docs/work/execution-instructions/OpenCode_执行指令.md`
 
 ## 优先级说明
 - **P0**：阻塞其他任务，必须先做
