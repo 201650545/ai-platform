@@ -259,6 +259,55 @@ button{font-family:var(--sf)}
 :root[data-style="liquid"][data-theme="dark"] .blobs .b2{opacity:.38}
 :root[data-style="liquid"][data-theme="dark"] .blobs .b3{opacity:.30}
 
+/* ═══════════ ⑥ 玄白 · 建筑极简（黑白建筑极简 / MONO）═══════════
+   建筑尺度+瑞士平面：大面积留白、绝对秩序、克制的黑白关系。
+   玻璃拟态→近实平板；光斑→隐去；圆角→直角利落；状态色→灰度层级(用权重/透明度区分)。
+   文本：现代无衬线；数字重、标签轻 = 编辑排版即视觉。 */
+:root[data-style="mono"]{
+  --fh:"Segoe UI","Helvetica Neue","Arial","PingFang SC","Microsoft YaHei",sans-serif;
+  --radius:6px;--radius-s:4px;
+  --shadow:0 2px 10px rgba(17,17,17,.05);--shadow-h:0 7px 22px rgba(17,17,17,.10);
+  /* 黑/白/冷灰/暖灰 纯灰度状态；用底色素与透明度表达层级，不用彩色 */
+  --green:#1f1f1f;--green-bg:rgba(17,17,17,.05);
+  --orange:#4a4a4a;--orange-bg:rgba(17,17,17,.04);
+  --red:#111111;--red-bg:rgba(17,17,17,.06);
+  --purple:#353535;--purple-bg:rgba(17,17,17,.05)}
+:root[data-style="mono"] .blobs{background:linear-gradient(180deg,var(--bg1),var(--bg2))}
+:root[data-style="mono"] .blobs i{opacity:0!important;animation:none!important}
+:root[data-style="mono"] .glass{
+  backdrop-filter:blur(3px) saturate(95%);-webkit-backdrop-filter:blur(3px) saturate(95%);
+  box-shadow:var(--shadow)}
+:root[data-style="mono"] .h-title{letter-spacing:-.028em;font-weight:800}
+:root[data-style="mono"] .h-stat .v,.hl-num .v,.rank-score b{font-weight:800;letter-spacing:-.025em}
+:root[data-style="mono"] .rank-score b{-webkit-background-clip:initial;background-clip:initial;color:var(--t)}
+/* 奖牌金→建筑灰，维持全局秩序 */
+:root[data-style="mono"] .rank-medal.g1,:root[data-style="mono"] .rank-medal.g2,:root[data-style="mono"] .rank-medal.g3{
+  background:linear-gradient(135deg,#3a3a3a,#1d1d1d);color:#f5f5f2;box-shadow:none}
+:root[data-style="mono"] .icm{filter:none;background:var(--t2)}
+:root[data-style="mono"] .style-b{box-shadow:none}
+:root[data-style="mono"][data-theme="light"]{
+  --bg1:#F3F2EE;--bg2:#EBEAE6;
+  --glass:rgba(255,255,255,.55);--glass2:rgba(255,255,255,.82);
+  --gborder:rgba(17,17,17,.14);--hl:rgba(17,17,17,.05);
+  --head-bg:rgba(255,255,255,.5);--thead:rgba(17,17,17,.035);
+  --t:#1b1a18;--t2:#30302e;--t3:#858583;--t4:#b4b4b0;
+  --line:rgba(17,17,17,.17);--line2:rgba(17,17,17,.075);
+  --term:rgba(17,17,17,.92);--term-t:#f0efeC}
+:root[data-style="mono"][data-theme="dark"]{
+  --bg1:#0e0e0d;--bg2:#151514;
+  --glass:rgba(24,24,23,.55);--glass2:rgba(32,32,30,.7);
+  --gborder:rgba(255,255,255,.14);--hl:rgba(255,255,255,.06);
+  --head-bg:rgba(18,18,17,.55);--thead:rgba(255,255,255,.04);
+  --t:#ecece8;--t2:#c2c2bd;--t3:#8a8a86;--t4:#5a5a57;
+  --line:rgba(255,255,255,.15);--line2:rgba(255,255,255,.07);
+  --green:#f0f0ec;--green-bg:rgba(255,255,255,.05);
+  --orange:#c2c2bd;--orange-bg:rgba(255,255,255,.04);
+  --red:#ffffff;--red-bg:rgba(255,255,255,.06);
+  --purple:#d0d0cc;--purple-bg:rgba(255,255,255,.05);
+  --term:rgba(245,245,240,.9);--term-t:#141413}
+@media (prefers-reduced-motion:reduce){
+  :root[data-style="mono"] .blobs i,:root[data-style="mono"] .glass{animation:none!important}}
+
 /* ═══ 图标着色：PNG 透明形状作 mask，颜色随主题色渐变 ═══ */
 .icm{display:inline-block;flex:none;background:linear-gradient(135deg,var(--accent) 18%,var(--accent2) 82%);
   -webkit-mask:var(--im) center/contain no-repeat;mask:var(--im) center/contain no-repeat;
@@ -1452,7 +1501,11 @@ const STYLES={
     {n:'海湾蓝',a:'#0a84ff',b:'#5e5ce6',t:'#1c2436',td:'#e9edf8'},
     {n:'日落',a:'#ff375f',b:'#ff9f0a',t:'#36242a',td:'#f7ecea'},
     {n:'薄荷',a:'#30d158',b:'#64d2ff',t:'#1c2f28',td:'#e9f4ee'},
-    {n:'葡萄紫',a:'#bf5af2',b:'#0a84ff',t:'#271f36',td:'#f0ecf7'}]}
+    {n:'葡萄紫',a:'#bf5af2',b:'#0a84ff',t:'#271f36',td:'#f0ecf7'}]},
+  mono:{n:'玄白 · 建筑极简',palettes:[
+    {n:'素黑',a:'#111111',b:'#45413d',t:'#1e1d1b',td:'#ecebe8'},
+    {n:'冷石灰',a:'#3a4149',b:'#1b2129',t:'#2e333a',td:'#e8eaec'},
+    {n:'暖灰',a:'#2e2a26',b:'#5f584e',t:'#302b26',td:'#ebe9e6'}]}
 };
 let curStyle='monet',curAccent=0;
 function hx6(h){h=String(h).replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
