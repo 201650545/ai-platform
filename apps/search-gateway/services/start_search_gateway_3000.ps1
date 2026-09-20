@@ -1,9 +1,9 @@
-﻿# start_search_gateway_3000.ps1 — spawn :3000 search gateway detached from any job
+# start_search_gateway_3000.ps1 — spawn :3000 search gateway detached from any job
 # Called by: Startup folder bat (logon) and watchdog_gateway.bat :3000 branch (auto-heal).
 # WMI Win32_Process.Create parents the process to WmiPrvSE so it survives the
 # caller's session/job closing — the root cause of the gateway dying silently.
-$wd = $PSScriptRoot
-$py = 'C:\Users\郭永涛\AppData\Local\Programs\Python\Python312\python.exe'
+$wd = 'D:\项目\ai-hub\search_gateway\services'
+$py = 'C:\Users\郭永涛\AppData\Roaming\uv\python\cpython-3.11.15-windows-x86_64-none\python.exe'
 # guard: engine warmup takes minutes before :3000 binds, so never spawn twice
 $existing = Get-CimInstance Win32_Process -Filter "Name like 'python%'" |
     Where-Object { $_.CommandLine -match 'search_gateway\.py' }

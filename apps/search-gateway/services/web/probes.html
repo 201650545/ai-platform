@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>探针看板 · 模型实测事实</title>
+<link rel="icon" type="image/png" href="/img/brand/favicon.png">
+<script>
+var EMBED = /(?:^|[?&])embed=1/.test(location.search);
+if(EMBED){document.documentElement.classList.add('embed');}
+(function(){
+ try{
+  var t=localStorage.getItem('gw-theme');
+  if(!t)t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+ }catch(e){document.documentElement.setAttribute('data-theme','light');}
+})();
+</script>
+<style>
+:root{
+  --accent:#0a84ff;
+  --acc-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --bg1:#eef1f8; --bg2:#e4e9f4;
+  --glass:rgba(255,255,255,.52); --gborder:rgba(255,255,255,.66);
+  --t:#1d1d1f; --t2:#55555c; --t3:#7a7a82;
+  --line:rgba(29,29,31,.14);
+  --green:#1fa54f; --green-bg:rgba(48,209,88,.17);
+  --orange:#c97400; --orange-bg:rgba(255,159,10,.18);
+  --red:#e0332a; --red-bg:rgba(255,59,48,.13);
+  --gray:#8a8a92; --gray-bg:rgba(142,142,147,.16);
+}
+:root[data-theme="dark"]{
+  --bg1:#0d1117; --bg2:#0a0e14;
+  --glass:rgba(255,255,255,.05); --gborder:rgba(255,255,255,.1);
+  --t:#f2f4f8; --t2:#b0b6c0; --t3:#7d8490;
+  --line:rgba(255,255,255,.14);
+  --green:#4cd37f; --green-bg:rgba(48,209,88,.12);
+  --orange:#f0a53a; --orange-bg:rgba(255,159,10,.14);
+  --red:#ff6b61; --red-bg:rgba(255,59,48,.14);
+  --gray:#98a0aa; --gray-bg:rgba(142,142,147,.14);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  min-height:100vh; font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  color:var(--t); padding:28px 20px 60px;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+h1{font-size:24px;font-weight:700;letter-spacing:.5px}
+.sub{color:var(--t3);font-size:13px}
+.theme-btn{margin-left:auto;border:1px solid var(--line);background:var(--glass);
+  border-radius:10px;padding:6px 14px;font-size:13px;color:var(--t2);cursor:pointer}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+.card{background:var(--glass); border:1px solid var(--gborder); border-radius:16px;
+  padding:14px 16px; backdrop-filter:blur(20px)}
+.card .k{font-size:12px;color:var(--t3);margin-bottom:6px}
+.card .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .v small{font-size:12px;color:var(--t3);font-weight:400}
+.bar{height:6px;border-radius:3px;background:var(--gray-bg);margin-top:8px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0 10px}
+.toolbar input[type=search]{
+  flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;
+  padding:9px 14px;font-size:14px;background:var(--glass);color:var(--t);outline:none}
+.toolbar input[type=search]:focus{border-color:var(--accent)}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{border:1px solid var(--line);background:var(--glass);border-radius:20px;
+  padding:5px 13px;font-size:12.5px;color:var(--t2);cursor:pointer;user-select:none}
+.fchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* embed 下父页注入 --acc-fg（与 --accent 恒对比），独立模式仍用白字 */
+html.embed .fchip.on{color:var(--acc-fg,#fff)}
+/* 全透明兜底（不依赖父页注入）：embed 下不许出现任何实底白块——
+   搜索框也透明只留描边；强调色改跟文字色（浅色=墨、暗色=亮），旧标签页同样生效 */
+html.embed{--accent:var(--t)}
+html.embed .toolbar input[type=search]{background:transparent}
+html.embed .fchip{background:transparent}
+.chan-head{margin:22px 0 10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.chan-head h2{font-size:17px;font-weight:700}
+.chan-head .cnt{font-size:12.5px;color:var(--t3)}
+.chan-head .bar{flex:1;min-width:120px;margin-top:0;max-width:220px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;
+  background:var(--glass);border:1px solid var(--gborder);border-radius:14px;
+  overflow:hidden;backdrop-filter:blur(20px)}
+.tablewrap{overflow-x:auto;border-radius:14px}
+th{text-align:left;padding:9px 12px;color:var(--t3);font-weight:600;font-size:12px;
+  border-bottom:1px solid var(--line);white-space:nowrap}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+td.model{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;max-width:380px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.c-avail{background:var(--green-bg);color:var(--green)}
+.c-paid{background:var(--red-bg);color:var(--red)}
+.c-unknown{background:var(--gray-bg);color:var(--gray)}
+.c-retired{background:var(--gray-bg);color:var(--t3)}
+.speed-cell{font-weight:700;font-variant-numeric:tabular-nums}
+.speed-dim{color:var(--t3);font-weight:400;font-size:12px}
+.foot{margin-top:26px;color:var(--t3);font-size:12.5px;line-height:1.8}
+.err{color:var(--red);padding:20px 0;font-size:14px}
+.empty{color:var(--t3);padding:20px 0;font-size:13.5px}
+/* embed 模式：被控制台 iframe 内嵌时隐藏自带页头，收紧内边距。
+   --bg1 已由控制台注入为父页纸色：Chromium 对 iframe 画布强制垫白，
+   CSS transparent 赢不了合成层（实测像素恒 255,255,255），故不追求
+   物理透明，改为把父页纸色直接画上——同色即视觉透明，与纸面无缝融合 */
+html.embed body{padding:8px 0 40px;background:var(--bg1,#f3f2ee)}
+html.embed{background:var(--bg1,#f3f2ee)}
+html.embed header{display:none}
+html.embed .summary{margin-top:6px}
+/* embed 下父页以 inline style 注入令牌（纸色/墨色/描边），优先级高于本文件的
+   :root 与 [data-theme] 块。iframe 无法对父页背景做 backdrop-filter 取样，
+   毛玻璃会退化成一块实心白，故 embed 下关掉它：卡表透明、只留细描边，
+   与控制台 architect 风格（纸面 + hairline）完全融合。 */
+html.embed .card,html.embed table{backdrop-filter:none;-webkit-backdrop-filter:none;background:transparent}
+html.embed th{border-bottom-color:var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔬 探针看板</h1>
+    <span class="sub">模型实测事实注册表 · 只读</span>
+    <button class="theme-btn" id="themeBtn">🌗 切换主题</button>
+  </header>
+  <div class="sub" id="meta">加载中…</div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="搜索模型名（如 claude、qwen、glm-5.3）…">
+    <div class="filters" id="filters">
+      <span class="fchip on" data-f="all">全部</span>
+      <span class="fchip" data-f="available">✅ 可用</span>
+      <span class="fchip" data-f="paid_required">💰 需付费</span>
+      <span class="fchip" data-f="unknown">❓ 未知</span>
+      <span class="fchip" data-f="fast">⚡ 速度榜</span>
+    </div>
+  </div>
+
+  <div id="content"></div>
+
+  <div class="foot">
+    数据来源：probe_runs 原始证据 → probe_reducer 单写者归并（model_probes.json + model_perf.json）→ /api/model-state 只读 DTO。<br>
+    探针只产事实：available = 实测调用成功；paid_required = 渠道实测 402/403（该模型需付费）；429 限流记 available 无速度；速度 = 单次实测 tok/s（p50）。本页不含推荐排序——路由策略由编排层决定。
+  </div>
+</div>
+
+<script>
+var DATA = null;
+var filter = 'all';
+var q = '';
+
+document.getElementById('themeBtn').onclick = function(){
+  var cur = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',cur);
+  try{localStorage.setItem('gw-theme',cur);}catch(e){}
+};
+// 主题同步：embed 模式下控制台切换主题写 gw-theme，这里跨 iframe 监听 storage 实时跟随
+window.addEventListener('storage',function(ev){
+  if(ev.key!=='gw-theme'||!ev.newValue)return;
+  document.documentElement.setAttribute('data-theme',ev.newValue);
+});
+
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function chip(state){
+  if(state==='available')   return '<span class="chip c-avail">✅ 可用</span>';
+  if(state==='paid_required')return '<span class="chip c-paid">💰 需付费</span>';
+  if(state==='unknown')     return '<span class="chip c-unknown">❓ 未知</span>';
+  if(state==='retired')     return '<span class="chip c-retired">🗑 已下架</span>';
+  return '<span class="chip c-unknown">'+esc(state||'—')+'</span>';
+}
+function speedHtml(p){
+  var v = p && p.tok_s_p50;
+  if(v==null) return '<span class="speed-dim">—</span>';
+  var extra = '';
+  if(p.samples_n && p.samples_n>1) extra = ' <span class="speed-dim">('+p.samples_n+'次)</span>';
+  return '<span class="speed-cell">'+v.toFixed(1)+'</span> <span class="speed-dim">tok/s</span>'+extra;
+}
+function fmtTime(s){
+  if(!s) return '';
+  var m = String(s).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  return m ? (m[1]+' '+m[2]) : s;
+}
+
+function render(){
+  var box = document.getElementById('content');
+  if(!DATA){ box.innerHTML='<div class="err">数据加载失败</div>'; return; }
+  var chs = DATA.channels||{};
+  var chNames = Object.keys(chs).sort();
+  var totalModels=0,totalAvail=0,totalPaid=0,totalUnknown=0;
+  var flat=[];
+
+  chNames.forEach(function(ch){
+    var ms = chs[ch]||{};
+    Object.keys(ms).forEach(function(md){
+      var e = ms[md]||{};
+      var a = e.access_state;
+      totalModels++;
+      if(a==='available') totalAvail++;
+      else if(a==='paid_required') totalPaid++;
+      else totalUnknown++;
+      var tok = (e.performance||{}).tok_s_p50;
+      flat.push({ch:ch, md:md, e:e, a:a, tok:tok});
+    });
+  });
+
+  // 汇总卡
+  document.getElementById('meta').textContent =
+    'revision '+DATA.revision+' · 生成于 '+fmtTime(DATA.as_of)+' · 共 '+chNames.length+' 渠道';
+  document.getElementById('summary').innerHTML =
+    card('模型总数', totalModels)+
+    card('✅ 实测可用', totalAvail)+
+    card('💰 需付费', totalPaid)+
+    card('❓ 未知/下架', totalUnknown);
+
+  // 过滤
+  var f = filter, kw = q.toLowerCase();
+  var show = flat.filter(function(r){
+    if(f==='available'||f==='paid_required'||f==='unknown'){
+      var st = f==='unknown' ? (r.a!=='available'&&r.a!=='paid_required') : r.a===f;
+      if(!st) return false;
+    }
+    if(f==='fast' && r.tok==null) return false;
+    if(kw && r.md.toLowerCase().indexOf(kw)<0) return false;
+    return true;
+  });
+  if(f==='fast') show.sort(function(x,y){return y.tok-x.tok;});
+
+  // 分渠道渲染（速度榜则平铺一张表）
+  var html = '';
+  if(f==='fast'){
+    html += '<div class="chan-head"><h2>⚡ 全渠道速度榜</h2><span class="cnt">'+show.length+' 个模型（有实测速度）</span></div>';
+    html += tableHtml(show);
+  } else {
+    chNames.forEach(function(ch){
+      var rows = show.filter(function(r){return r.ch===ch;});
+      if(!rows.length) return;
+      var n=rows.length;
+      var av=rows.filter(function(r){return r.a==='available';}).length;
+      var pd=rows.filter(function(r){return r.a==='paid_required';}).length;
+      var pct = n? Math.round(av/n*100):0;
+      html += '<div class="chan-head"><h2>'+esc(ch)+'</h2>'
+        +'<span class="cnt">'+n+' 模型 · '+av+' 可用'+(pd?' · '+pd+' 需付费':'')+'</span>'
+        +'<span class="bar"><i style="width:'+pct+'%"></i></span></div>'
+        + tableHtml(rows);
+    });
+    if(!html) html = '<div class="empty">没有匹配的模型</div>';
+  }
+  box.innerHTML = html;
+}
+function card(k,v){
+  return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';
+}
+function tableHtml(rows){
+  var h = '<div class="tablewrap"><table><thead><tr>'
+    +'<th style="width:26px">#</th><th>模型</th><th>状态</th>'
+    +'<th class="num">速度</th><th class="num">计费</th>'
+    +'<th>观测时间</th></tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var b = (r.e.billing||{});
+    var cls = b.class==='free'?'<span class="chip c-avail">免费</span>'
+             : b.class==='paid'?'<span class="chip c-paid">付费</span>'
+             : '<span class="speed-dim">—</span>';
+    h += '<tr><td class="num">'+(i+1)+'</td>'
+      +'<td class="model" title="'+esc(r.md)+'">'+esc(r.md)+'</td>'
+      +'<td>'+chip(r.a)+'</td>'
+      +'<td class="num">'+speedHtml(r.e.performance)+'</td>'
+      +'<td class="num">'+cls+'</td>'
+      +'<td class="speed-dim">'+fmtTime(r.e.observed_at)+'</td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+
+document.getElementById('filters').onclick = function(ev){
+  var t = ev.target.closest('.fchip');
+  if(!t) return;
+  document.querySelectorAll('.fchip').forEach(function(x){x.classList.remove('on');});
+  t.classList.add('on');
+  filter = t.getAttribute('data-f');
+  render();
+};
+document.getElementById('q').oninput = function(){
+  q = this.value.trim();
+  render();
+};
+
+fetch('/api/model-state').then(function(r){return r.json();}).then(function(d){
+  DATA = d; render();
+}).catch(function(e){
+  document.getElementById('content').innerHTML =
+    '<div class="err">加载失败：'+esc(e.message)+'（网关 :3100 未启动？）</div>';
+});
+</script>
+</body>
+</html>

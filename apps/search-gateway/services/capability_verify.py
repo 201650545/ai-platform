@@ -118,9 +118,17 @@ def verify_channel(channel_id, definition):
 
 
 def persist_results(channel_id, model, verified):
-    """写实测真值到运行时 model_capabilities.json（热重载文件）。chat=False=整渠道隔离。"""
+    """写实测真值到运行时 model_capabilities.json（热重载文件）。chat=False=整渠道隔离。
+    同时 emit 不可变 run 文件（probe_reducer 真源），本直写仅为兼容视图快路径。"""
     if not model or not verified:
         return
+    try:  # producer：事实先落 run，reducer 稍后归并（失败不阻塞直写）
+        import probe_reducer
+        probe_reducer.emit_run(channel_id, model, "capabilities",
+                               {k: verified.get(k) for k in ("chat", "vision", "tools")},
+                               writer="capability_verify")
+    except Exception:  # noqa: BLE001
+        pass
     path = capabilities.CAP_FILE if os.path.exists(capabilities.CAP_FILE) \
         else os.path.join(channels.DATA_DIR, "model_capabilities.json")
     with _write_lock:

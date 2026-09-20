@@ -199,9 +199,11 @@ def _needs_auth(path):
     # /api/resource-config/status 只读健康/观测端点（仅含加载状态元数据，无配置无密钥），免鉴权
     # /dispatch + /api/dispatch/status 派发中心可视化（只读观测，无配置无密钥），免鉴权
     # /speed + /api/speed/test 每日渠道测速可视化（只读观测，无配置无密钥），免鉴权
+    # /probes 探针看板（只读观测 /api/model-state，无配置无密钥），免鉴权
     if path in ("/", "/index.html", "/dispatch", "/dispatch/live", "/healthz",
                 "/api/resource-config/status", "/api/dispatch/status",
-                "/speed", "/api/speed/test", "/api_page.html"):
+                "/speed", "/api/speed/test", "/api_page.html",
+                "/probes", "/api/model-state"):
         return False
     # /dispatch/live 三级页数据（/api/dispatch/live/list 与 /api/dispatch/live/<task_id>）：
     # 只读运行实况观测，无配置无密钥 → 免鉴权
@@ -241,7 +243,7 @@ def usage_summary():
 # ---------------------------------------------------------------- 路由日志（线程安全）
 _ROUTE_LOG = []
 _ROUTE_LOG_LOCK = threading.Lock()
-_ROUTE_LOG_MAX = 200  # 最多保留 200 条（用户 2026-08-29 要求扩大可见范围）
+_ROUTE_LOG_MAX = 500  # 最多保留 500 条（2026-09-20 日志页提密度后单屏信息量×4，同步扩可见范围）
 # 路由日志落盘（2026-08-30 用户要求：重启后仍可查"调用确认走了"）。与 quota 同目录按网关隔离。
 _ROUTE_LOG_FILE = os.path.join(channels.DATA_DIR, "api_gateway", "route_log.jsonl")
 
@@ -558,6 +560,33 @@ def route_completion(payload):
     # （池链同样适用：池内也可能含代理渠道）
     chain = fault_domains.promote_on_proxy_down(chain)
 
+    # 2026-09-18 测试页渠道锁定（用户需求：单渠道单测 / 多渠道并测）：
+    # 请求体带 _pin_channel 时，把候选链收窄为「仅该渠道」——绕过回落链，
+    # 用于「我只想测某一个渠道的这个模型」以及并测时逐渠道独立打点。
+    # 语义边界：_pin_channel 是**测试专用**参数，只影响本次请求的候选链，
+    # 不改路由配置、不写回任何状态。若指定渠道不在原链中，则按 (pin, model)
+    # 直接构造单元素链（允许测链外的渠道，但仍是该模型在该渠道的真实调用）。
+    _pin = None
+    if isinstance(payload, dict):
+        _pin = payload.get("_pin_channel") or payload.get("pin_channel")
+    if _pin:
+        _pin = str(_pin)
+        _matched = [(c, m) for c, m in chain if c == _pin]
+        if _matched:
+            chain = _matched
+        else:
+            # 链外渠道：查该渠道对该模型的真实上游名，找不到就用原模型名
+            _real = None
+            try:
+                for _p in (channels.model_providers(model) or []):
+                    if _p.get("id") == _pin:
+                        _real = (_p.get("matched_models") or [None])[0]
+                        break
+            except Exception:  # noqa: BLE001
+                _real = None
+            chain = [(_pin, _real or model)]
+        source = "pinned"
+
     # 构建路由日志入口（记录 attempted 和 resolved，稍后补 full 信息）
     attempted = [cid for cid, _ in chain]
     log_entry = {
@@ -612,6 +641,9 @@ def route_completion(payload):
         try:
             p2 = dict(payload)
             p2["model"] = real_model  # 映射为该渠道实际模型名
+            # 2026-09-18: 剔除测试专用参数，避免透传给上游造成 400
+            p2.pop("_pin_channel", None)
+            p2.pop("pin_channel", None)
             log_entry["resolved_channel"] = cid
             log_entry["resolved_model"] = real_model
             log_entry["resolved_class"] = (pricing.peek_class(cid, real_model) or {}).get("class")
@@ -966,6 +998,67 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
     def _send_json(self, status, obj):
         self._send(status, "application/json; charset=utf-8", json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
+    @staticmethod
+    def _model_state_dto(query):
+        """探针事实只读 DTO：拼 model_probes + model_perf + 运行时状态（熔断/限流）。
+        可选过滤：?channel=cloudflare&model=@cf/...&available=1"""
+        import probe_reducer
+        probes = probe_reducer._load_json(probe_reducer.PROBES_JSON, {"channels": {}})
+        perf = probe_reducer._load_json(probe_reducer.PERF_JSON, {"channels": {}})
+        try:
+            import fault_domains as _fd
+            tripped = {cid for cid in (channels.CHANNELS or {})
+                       if _fd.is_tripped(cid)} if hasattr(_fd, "is_tripped") else set()
+        except Exception:  # noqa: BLE001
+            tripped = set()
+        ch_f = (query.get("channel") or [""])[0]
+        md_f = (query.get("model") or [""])[0]
+        avail_f = (query.get("available") or [""])[0]
+        out_ch = {}
+        for ch, ch_entry in (probes.get("channels") or {}).items():
+            if ch_f and ch != ch_f:
+                continue
+            out_md = {}
+            for md, entry in (ch_entry.get("models") or {}).items():
+                if md_f and md != md_f:
+                    continue
+                p = (perf.get("channels") or {}).get(ch, {}).get("models", {}).get(md, {})
+                access = (entry.get("access") or {}).get("state")
+                rec = {
+                    "channel": ch, "model": md,
+                    "catalog_state": (entry.get("catalog") or {}).get("state"),
+                    "access_state": access,
+                    "capabilities": (entry.get("capabilities") or {}).get("values") or {},
+                    "billing": {k: v for k, v in (entry.get("billing") or {}).items()
+                                if k in ("class", "billing_model", "meter_unit", "free_allowance", "cost_sample")},
+                    "performance": {
+                        "tok_s_p50": p.get("tok_s_p50"), "tok_s_ewma": p.get("tok_s_ewma"),
+                        "ttft_ms_p50": p.get("ttft_ms_p50"),
+                        "success_rate": p.get("success_rate"),
+                        "confidence": p.get("confidence"),
+                        "samples_n": p.get("samples_n"),
+                        "last_sample_at": p.get("last_sample_at"),
+                    },
+                    "runtime": {
+                        "fault_domain_tripped": ch in tripped,
+                    },
+                    "observed_at": max(
+                        (entry.get(s, {}) or {}).get("observed_at") or ""
+                        for s in ("catalog", "access", "capabilities", "billing")
+                    ),
+                }
+                if avail_f == "1" and access != "available":
+                    continue
+                out_md[md] = rec
+            if out_md:
+                out_ch[ch] = out_md
+        return {
+            "schema_version": 1,
+            "as_of": probes.get("generated_at"),
+            "revision": probes.get("revision"),
+            "channels": out_ch,
+        }
+
     def _require_auth(self, path):
         """网关 API key 守卫：未配置 key（旧行为）或路径豁免 → 放行；
         已配置 key → 要求 Authorization: Bearer <key>，不符回 401。"""
@@ -1228,6 +1321,16 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path, query = parsed.path, urllib.parse.parse_qs(parsed.query)
+        # 2026-09-16: 本机控制台凭据自举 —— 仅回环请求可取 key（等效于读本机
+        # api_state.json，无新增暴露面）；非回环一律 403。控制台首次打开免配置。
+        if path == "/api/local-console-bootstrap":
+            client = (self.client_address[0] or "")
+            if client in ("127.0.0.1", "::1", "localhost"):
+                self._send_json(200, {"api_key": get_api_key()})
+            else:
+                self._send_json(403, {"error": {"message": "local loopback only",
+                                                "type": "forbidden"}})
+            return
         if not self._require_auth(path):
             return
         if path in ("/", "/index.html"):
@@ -1246,6 +1349,11 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             # 每日渠道测速可视化页（免鉴权只读）
             self._send(200, "text/html; charset=utf-8",
                        _read_page("speed.html").encode("utf-8"),
+                       extra_headers={"Cache-Control": "no-cache"})
+        elif path == "/probes":
+            # 探针看板页（免鉴权只读）：可视化 /api/model-state 事实注册表
+            self._send(200, "text/html; charset=utf-8",
+                       _read_page("probes.html").encode("utf-8"),
                        extra_headers={"Cache-Control": "no-cache"})
         elif path == "/api_page.html":
             # 控制台页面本体（HTML 骨架，无数据；数据接口仍走鉴权）
@@ -1364,9 +1472,19 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             else:
                 merged = disk[:_ROUTE_LOG_MAX - len(mem)] + mem
             self._send_json(200, {"log": merged})
+        elif path == "/api/cold-channels":
+            # 2026-09-18 冷宫状态（用户可操作）：读 data/cold_channels.json。
+            # 返回 {cold: [渠道id...], notes: {渠道id: 用户备注}}，前端据此渲染亮/黑。
+            cold = _read_cold_channels()
+            self._send_json(200, cold)
+            return
         elif path == "/api/gateway-catalog":
             # 三拆配置只读汇总（catalog/routes/registry + counts），供外部 AI 与调试读取。
             self._send_json(200, catalog_routes.summary())
+        elif path == "/api/model-state":
+            # 探针事实只读 DTO（编排模型消费入口）：model_probes + model_perf + 运行时状态。
+            # 只含事实（无 rank/recommended——那是策略，归 orchestration_policy）。
+            self._send_json(200, self._model_state_dto(query))
         elif path == "/v1/sse":
             model = query.get("model", [""])[0]
             prompt = query.get("prompt", [""])[0]
@@ -1480,6 +1598,41 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, {"status": "ok", "name": channels.normalize_model_name(name),
                                   "entry": entry})
             return
+        if path == "/api/cold-channels":
+            # 2026-09-18 用户手动打入/放出冷宫：body = {channel: id, cold: true/false, note: "..."}
+            # 或首次初始化：body = {init: {cold: [...], notes: {...}}}
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            if isinstance(data.get("init"), dict):
+                cold_data = {"cold": sorted(set(data["init"].get("cold") or [])),
+                             "notes": data["init"].get("notes") or {},
+                             "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+                _write_cold_channels(cold_data)
+                self._send_json(200, {"status": "ok", "data": cold_data})
+                return
+            cid = (data.get("channel") or "").strip()
+            cold = bool(data.get("cold"))
+            note = (data.get("note") or "").strip()
+            if not cid:
+                self._send_json(400, {"error": "channel 必填"})
+                return
+            cold_data = _read_cold_channels()
+            cold_set = set(cold_data.get("cold") or [])
+            if cold:
+                cold_set.add(cid)
+                if note:
+                    cold_data.setdefault("notes", {})[cid] = note
+            else:
+                cold_set.discard(cid)
+                cold_data.get("notes", {}).pop(cid, None)
+            cold_data["cold"] = sorted(cold_set)
+            cold_data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            _write_cold_channels(cold_data)
+            self._send_json(200, {"status": "ok", "data": cold_data, "channel": cid})
+            return
         if path == "/api/channels":
             # 新增自定义渠道：写 channels.json custom_channels，免改代码、免重启
             try:
@@ -1582,6 +1735,31 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):  # noqa: D401
         pass
+
+
+_COLD_JSON = os.path.join(channels.DATA_DIR, "cold_channels.json")
+
+
+def _read_cold_channels():
+    """冷宫状态（用户 2026-09-18 起可自行操作，不再写死在前端）。
+    文件结构：{cold:[渠道id], notes:{渠道id: 备注}, updated_at}。缺文件/损坏 → 空表。"""
+    try:
+        with open(_COLD_JSON, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        if isinstance(d, dict):
+            d.setdefault("cold", [])
+            d.setdefault("notes", {})
+            return d
+    except Exception:  # noqa: BLE001
+        pass
+    return {"cold": [], "notes": {}, "updated_at": None}
+
+
+def _write_cold_channels(d):
+    tmp = _COLD_JSON + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, _COLD_JSON)
 
 
 def _read_page(name="api_page.html"):

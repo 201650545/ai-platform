@@ -164,6 +164,21 @@ def run_all():
     with open(os.path.join(OUT_DIR, "history.jsonl"), "a", encoding="utf-8") as f:
         for r in results:
             f.write(json.dumps({"date": str(date.today()), **r}, ensure_ascii=False) + "\n")
+    try:  # producer：perf 事实落 run 文件，由 probe_reducer 归并（失败不影响原快照）
+        import probe_reducer
+        for r in results:
+            if not r.get("model"):
+                continue
+            probe_reducer.emit_run(
+                r["channel"], r["model"], "perf",
+                {"ok": bool(r.get("ok")), "tok_s": r.get("tok_s"),
+                 "ttft_ms": (r.get("ttft_s") * 1000) if r.get("ttft_s") is not None else None,
+                 "total_ms": (r.get("total_s") * 1000) if r.get("total_s") is not None else None,
+                 "completion_tokens": r.get("completion_tokens"),
+                 "error": r.get("error")},
+                writer="daily_speed_test")
+    except Exception as e:  # noqa: BLE001
+        print(f"[speed] probe_reducer emit skipped: {e}")
     ok_n = sum(1 for r in results if r.get("ok"))
     print(f"[speed] 完成：{ok_n}/{len(results)} 成功 → {day_path}")
     return snapshot

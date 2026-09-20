@@ -90,9 +90,9 @@ CHANNELS = {
         "free": True,
         
         "speed": "fast",
-        "default_model": "openai/gpt-oss-120b",
-        "models": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "groq/compound-mini"],
-        "note": "LPU 硬件加速，免费配额，0 欠费风险。",
+        "default_model": "qwen/qwen3.8-27b",
+        "models": ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini", "allam-2-7b"],
+        "note": "LPU 硬件加速，免费配额，0 欠费风险。2026-09-20 按 probe 实测更新：删 catalog 已无的 qwen3.6-27b；补 groq/compound（166 tok/s 最快）、allam-2-7b（110 tok/s）；默认模型换 qwen3.8-27b（101 tok/s、1.1s 总耗时全目录最快响应）。注意：①前置 CF 挡无 User-Agent 请求（403），直连须带 UA；②API 无内置计费字段，免费档限 TPM/RPM 分层。",
     },
     "siliconflow": {
         "name": "硅基流动 SiliconFlow",
@@ -120,9 +120,9 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "glm-4-flash",
-        "models": ["glm-4-flash", "glm-4.5-flash", "glm-4-air"],
-        "note": "GLM-4-Flash 永久免费，0 欠费风险。",
+        "default_model": "glm-4.7-flash",
+        "models": ["glm-4.7-flash", "glm-4-flash", "glm-4.5-flash", "glm-4-air"],
+        "note": "GLM-4.7-Flash / GLM-4-Flash 永久免费，0 欠费风险。",
     },
     "modelscope": {
         "name": "魔塔社区 ModelScope",
@@ -180,8 +180,13 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "agnes-2.5-flash",
-        "models": ["agnes-2.5-flash", "agnes-image-2.1-flash", "agnes-video-v2.0"],
+        "default_model": "agnes-2.5-pro",
+        "models": [
+            "agnes-2.5-pro", "agnes-2.5-pro-alpha", "agnes-2.5-pro-beta",
+            "agnes-3.0-flash", "agnes-2.5-flash", "agnes-2.0-flash",
+            "agnes-image-2.5-flash", "agnes-image-2.1-flash", "agnes-image-2.0-flash",
+            "agnes-video-2.5", "agnes-video-2.5-flash", "agnes-video-v2.0"
+        ],
         "note": "AGNES AI（Cherry Studio 已配置 key，2026-08-16 收录）。",
     },
     "xiaohongshu": {
@@ -747,15 +752,18 @@ def load_model_rank():
 
 
 def get_channel_selection(cid):
-    """返回该渠道已选模型列表；未策展返回 None（区别于"选了但为空"——空列表同样视为未策展）。"""
-    sel = (load_channel_models().get(cid) or {}).get("selected")
-    if not isinstance(sel, list) or not sel:
+    """返回该渠道已选模型列表；未策展返回 None（若显式配置了空列表 [] 则返回空列表）。"""
+    m = load_channel_models().get(cid)
+    if not m or "selected" not in m:
+        return None
+    sel = m.get("selected")
+    if not isinstance(sel, list):
         return None
     return list(sel)
 
 
 def set_channel_selection(cid, names):
-    """保存渠道已选模型；空列表 = 取消策展（回到全量）。返回清洗后的列表。"""
+    """保存渠道已选模型；None = 取消策展（回到全量），空列表 = 显式策展为0个。返回清洗后的列表。"""
     if cid not in CHANNELS:
         raise ValueError("未知渠道: " + cid)
     clean, seen = [], set()
@@ -765,10 +773,10 @@ def set_channel_selection(cid, names):
             seen.add(n)
             clean.append(n)
     cfg = load_channel_models()
-    if clean:
-        cfg[cid] = {"selected": clean}
-    else:
+    if names is None:
         cfg.pop(cid, None)
+    else:
+        cfg[cid] = {"selected": clean}
     save_channel_models(cfg)
     return clean
 
@@ -904,6 +912,9 @@ def channel_health(channel_id):
         models = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
         if channel_id == "gemini":
             models = [m.split("/", 1)[-1] for m in models if m]  # 去掉 models/ 前缀
+        if channel_id == "zhipu":
+            if "glm-4.7-flash" not in models:
+                models.append("glm-4.7-flash")
         models = sorted(set(models or ch.get("models", [])))  # 全量目录，不再截断（前端按厂商分组展示）
         return {"id": channel_id, "name": name, "icon": icon, "key_set": True, "reachable": True, "models": models,
                 "error": "", "can_fill": can_fill, "provider": provider,
@@ -1396,9 +1407,9 @@ def all_models(only_selected=False, gatekeep=False):
             continue
         ch = CHANNELS.get(cid, {})
         models = st.get("models", []) or []
-        # 渠道模型策展：已选列表存在时，对外只暴露已选（详情页仍可看全量、按名调用不受限）
+        # 渠道模型策展：已选列表存在时，对外只暴露已选（即使为空列表也是严格暴露已选，详情页仍可看全量、按名调用不受限）
         sel = (sel_map.get(cid) or {}).get("selected")
-        if isinstance(sel, list) and sel:
+        if isinstance(sel, list):
             sset = set(sel)
             models = [m for m in models if m in sset]
         elif only_selected and not gatekeep:

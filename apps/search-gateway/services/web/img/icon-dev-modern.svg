@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="开发中心">
+<rect width="200" height="200" fill="#ffffff"/>
+<path d="M84 32 C84 32 52 32 52 58 L52 82 C52 95 40 96 40 100 C40 104 52 105 52 118 L52 142 C52 168 84 168 84 168" fill="none" stroke="#111111" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M116 32 C116 32 148 32 148 58 L148 82 C148 95 160 96 160 100 C160 104 148 105 148 118 L148 142 C148 168 116 168 116 168" fill="none" stroke="#111111" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="100" cy="100" r="30" fill="#2563eb" opacity="0.18"/>
+<circle cx="100" cy="100" r="20" fill="#2563eb"/>
+</svg>
