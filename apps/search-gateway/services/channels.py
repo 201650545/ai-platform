@@ -1442,6 +1442,34 @@ def all_models(only_selected=False, gatekeep=False):
     # 隐藏模型：不出现在模型列表（直接按名请求仍可路由）
     for nm in set(load_model_overrides().get("hidden") or []):
         model_map.pop(nm, None)
+    # 成员池别名（三拆 model_routes members[]）：注入为独立条目，成员=池内各渠道上游名。
+    # 2026-09-21 三档免费线重建：free-fast/free-balanced/free-heavy 是产品契约（model_catalog），
+    # 客户端只看 /v1/models 与 /api/models，不注入则别名不可见（只能按名盲调）。
+    # 与统一组同形：providers 按池内顺序（select_members 同源顺序），成员渠道须 enabled+key。
+    try:
+        import catalog_routes as _cr
+        h_pool = h
+        for alias, route in _cr.routes().items():
+            members = route.get("members") or []
+            if not members:
+                continue
+            provs = []
+            for m in members:
+                cid, up = m.get("channel"), m.get("model")
+                if not cid or not up or cid not in CHANNELS:
+                    continue
+                st = h_pool.get(cid, {})
+                if not st.get("enabled", True) or not st.get("key_set"):
+                    continue
+                provs.append(_custom_provider_entry(cid, up, h_pool))
+            if provs:
+                ent = _cr.catalog_entry(alias)
+                mm = {"name": alias, "providers": provs, "custom": True}
+                if isinstance(ent, dict) and ent.get("display"):
+                    mm["display"] = ent["display"]
+                model_map[alias] = mm
+    except Exception:  # noqa: BLE001 — 配置缺失/损坏不影响模型列表主流程
+        pass
     # 统一模型组：跨厂商归一名 → 覆盖为独立条目（成员=显式配置的各渠道上游名）
     for uname, u in load_unified().items():
         provs = []
@@ -1510,6 +1538,24 @@ def model_providers(model_name, full=False):
         if st.get("enabled", True) and st.get("key_set"):
             return [_custom_provider_entry(pinned, real, h)]
         return []
+    # 成员池别名（三拆 routes）：精确命中 → 池内成员链（保序，同 route_completion 口径）。
+    # 反查走池链而非包含搜索，前端"这个模型走哪"与实际转发一致。
+    try:
+        import catalog_routes as _cr
+        if _cr.has_member_pool(q):
+            h = cached_health_all()
+            members = []
+            for m in _cr.members_of(q):
+                cid, up = m.get("channel"), m.get("model")
+                if not cid or not up or cid not in CHANNELS:
+                    continue
+                st = h.get(cid, {})
+                if not st.get("enabled", True) or not st.get("key_set"):
+                    continue
+                members.append(_custom_provider_entry(cid, up, h))
+            return members
+    except Exception:  # noqa: BLE001 — 三拆配置不可用时回落包含搜索
+        pass
     # 统一模型组：精确命中归一名 → 只用显式成员（转发时按渠道改写为上游真实名），不参与包含搜索
     uni = load_unified().get(normalize_model_name(q))
     if uni is not None:
