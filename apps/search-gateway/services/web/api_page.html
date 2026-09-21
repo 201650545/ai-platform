@@ -199,10 +199,13 @@ a{color:inherit}
 .tier-tag{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .tier-use{font-size:10px;color:var(--muted);line-height:1.6;flex-basis:100%;max-width:640px}
 .tier-chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:2px 0 6px}
-.tier-node{flex:0 0 auto;min-width:118px;max-width:172px;border:1px solid var(--line);border-radius:3px;padding:10px 12px 9px;background:transparent;display:flex;flex-direction:column;gap:5px}
-.tier-node.primary{background:color-mix(in srgb,var(--ink) 6%,transparent)}
-.tier-node.offline{opacity:.38}
-.tier-node.paid{border-style:dashed}
+/* 2026-09-21 郭老师反馈：不要实心边框卡片，改渐变透明，链上从左到右透明度递增
+   （越靠后=回落优先级越低越淡）；每张卡自身背景也是左实右虚的横向渐变。 */
+.tier-node{flex:0 0 auto;min-width:118px;max-width:172px;border:0;border-radius:3px;padding:10px 12px 9px;display:flex;flex-direction:column;gap:5px;background:linear-gradient(90deg,color-mix(in srgb,var(--ink) 7%,transparent),color-mix(in srgb,var(--ink) 2%,transparent) 55%,transparent 95%)}
+.tier-node.primary{background:linear-gradient(90deg,color-mix(in srgb,var(--ink) 13%,transparent),color-mix(in srgb,var(--ink) 4%,transparent) 55%,transparent 95%)}
+.tier-node.paid .n-ch i{background:transparent;border:1px dotted var(--ink)}
+/* 链级渐隐：每张卡整卡透明度随序号递减（JS 内联 style 按 i/N 计算），此处只兜底 */
+.tier-node.offline{opacity:.3}
 .tier-node .n-ch{font-size:11px;font-weight:640;display:flex;align-items:center;gap:7px}
 .tier-node .n-ch i{width:7px;height:7px;border-radius:50%;background:var(--ink);flex:0 0 7px}
 .tier-node.offline .n-ch i{background:transparent;border:1px dashed var(--ink)}
@@ -2028,7 +2031,9 @@ async function renderTierMap(){
         tokHtml=`<div class="n-tok"><span class="u">${t('tierNoTok')}</span></div>`;
       }
       const tip=[i===0?t('tierFirst'):null,m.channel==='bai'?t('tierPaid'):null,!live?t('tierOfflineCh'):null].filter(Boolean).join(' · ');
-      return `<div class="${cls}"${tip?` title="${esc(tip)}"`:''}><div class="n-ch"><i></i>${esc(m.channel)}</div><div class="n-md">${esc(m.model||'—')}</div>${tokHtml}</div>`;
+      /* 链级渐隐：首卡 1.0 → 末卡 0.45，线性随序号递减（回落越靠后越淡） */
+      const fade=members.length>1?1-(i/(members.length-1))*0.55:1;
+      return `<div class="${cls}" style="opacity:${fade.toFixed(3)}"${tip?` title="${esc(tip)}"`:''}><div class="n-ch"><i></i>${esc(m.channel)}</div><div class="n-md">${esc(m.model||'—')}</div>${tokHtml}</div>`;
     });
     const chain=nodes.join('<div class="tier-edge" aria-hidden="true"></div>');
     const first=members[0]||{};
