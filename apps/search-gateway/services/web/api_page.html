@@ -189,6 +189,33 @@ a{color:inherit}
 .probes-summary-k{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .probes-summary-v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.3}
 .probes-summary-v small{font-size:9px;color:var(--muted);font-weight:400;letter-spacing:.08em}
+/* 2026-09-21 三档免费线路由图（routes 视图）：横向成员链，节点=渠道+上游模型，
+   边注=实测 tok/s（探针 tok_s_p50）。单色语法沿用 console tag/dot；速度柱只在有实测值时渲染。 */
+.tiers-wrap{display:flex;flex-direction:column;gap:0}
+.tier-row{border-top:1px solid var(--line);padding:26px 0 30px}
+.tier-row:last-child{border-bottom:1px solid var(--line)}
+.tier-meta{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 18px}
+.tier-name{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.tier-tag{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tier-use{font-size:10px;color:var(--muted);line-height:1.6;flex-basis:100%;max-width:640px}
+.tier-chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:2px 0 6px}
+.tier-node{flex:0 0 auto;min-width:118px;max-width:172px;border:1px solid var(--line);border-radius:3px;padding:10px 12px 9px;background:transparent;display:flex;flex-direction:column;gap:5px}
+.tier-node.primary{background:color-mix(in srgb,var(--ink) 6%,transparent)}
+.tier-node.offline{opacity:.38}
+.tier-node.paid{border-style:dashed}
+.tier-node .n-ch{font-size:11px;font-weight:640;display:flex;align-items:center;gap:7px}
+.tier-node .n-ch i{width:7px;height:7px;border-radius:50%;background:var(--ink);flex:0 0 7px}
+.tier-node.offline .n-ch i{background:transparent;border:1px dashed var(--ink)}
+.tier-node .n-md{font-family:var(--font-mono);font-size:8.5px;color:var(--muted);word-break:break-all;line-height:1.5}
+.tier-node .n-tok{font-family:var(--font-mono);font-size:9px;color:var(--ink-2);display:flex;align-items:baseline;gap:6px}
+.tier-node .n-tok .bar{height:3px;background:var(--ink);opacity:.55;align-self:center}
+.tier-node .n-tok .v{font-variant-numeric:tabular-nums}
+.tier-node .n-tok .u{color:var(--muted);font-size:8px;letter-spacing:.08em}
+.tier-edge{flex:0 0 26px;display:grid;place-items:center;position:relative}
+.tier-edge::before{content:"";width:12px;height:1px;background:var(--ink);opacity:.42}
+.tier-edge::after{content:"";position:absolute;right:6px;width:4px;height:4px;border-top:1px solid var(--ink);border-right:1px solid var(--ink);transform:rotate(45deg);opacity:.42}
+.tier-first-note{font-size:9px;color:var(--muted);letter-spacing:.08em;margin-top:12px}
+.tier-first-note b{font-weight:600;color:var(--ink-2)}
 /* Fog veil (::before) must never re-animate on view switches: only content children fade. */
 .view.active>*{animation:fadeIn .34s var(--ease)}
 @keyframes fadeIn{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -1150,6 +1177,10 @@ body{position:relative}
 
       <section class="view" id="view-routes" data-view="routes">
         <div class="view-head"><div><div class="view-kicker">02 / Routing plane</div><div class="view-title" data-i18n="routesTitle">Route Management</div><div class="view-sub" data-i18n="routesSub">成员池按 <span class="mono">members[]</span> 原顺序选择；不渲染未实现的额度/延迟动态加权。显式 backup 仅在 <span class="mono">fallback_policy.enabled=true</span> 时展示。</div></div><div class="view-tools"><select class="line-select" id="routeAlias"></select></div></div>
+        <div class="section" style="padding:34px 0 10px;border-bottom:0">
+          <div class="section-head"><div class="section-title" data-i18n="tiersTitle">三档免费线路由图</div><div class="section-note" data-i18n="tiersNote">箭头即回落顺序：调用按 members[] 从左到右逐个尝试，前面节点失败才落到下一个。速度标注为探针实测 tok/s（无实测则留空）。</div></div>
+          <div id="tierMap" class="tiers-wrap"></div>
+        </div>
         <div id="routeDetail"></div>
       </section>
 
@@ -1307,6 +1338,8 @@ zh:{
  truth3:'故障域：仅在后端显式字段或 route-log 的 proxy_blocked 观测证据存在时表达；无证据时显示“live state not exposed”，不猜测。',
  truth4:'成员选择：按 members[] 原顺序，不做额度+延迟动态加权。',
  truth5:'备用链：只有 fallback_policy.enabled=true 才展示。',
+ tiersTitle:'三档免费线路由图',tiersNote:'箭头即回落顺序：调用按 members[] 从左到右逐个尝试，前面节点失败才落到下一个。速度标注为探针实测 tok/s（无实测则留空）。首跳=当前默认选中成员。节点虚线框=计费非免费池标注。',
+ tierMapEmpty:'暂无 free-* 三档路由（/api/gateway-catalog 未返回成员池）',tierTok:'tok/s',tierNoTok:'无实测',tierFirst:'首跳',tierPaid:'付费渠道成员（谨慎，不保证免费）',tierOfflineCh:'渠道未启用/不可达',
  sConfigured:'已配置 · ••••••••',sMissing:'缺失 · ————',swEnabled:'已启用',swPaused:'已暂停',swUnknown:'未知',sUnknown:'未知 · ————',
  toastBaseSaved:'API base 已保存',toastKeyStored:'观测凭据已存入本地',toastKeyCleared:'观测凭据已清除',toastPartial:'刷新完成，但部分端点出错',toastRefreshed:'数据已刷新',
  toastSwUnknown:'网关启用状态未知，未执行切换。',confirmResume:'恢复 API 转发？',confirmPause:'暂停 API 转发？',toastGwOn:'网关已启用',toastGwOff:'网关已暂停',toastToggleFail:'切换失败：'
@@ -1362,6 +1395,7 @@ en:{
  truth3:'Fault domain: expressed only with explicit backend fields or proxy_blocked evidence in route-log; without evidence it shows “live state not exposed” — never a guess.',
  truth4:'Member selection: strict members[] order, no quota+latency dynamic weighting.',
  truth5:'Backup chain: shown only when fallback_policy.enabled=true.',
+ tiersTitle:'Three free tiers — route map',tiersNote:'Arrows are fallback order: each call walks members[] left to right, only moving on when an earlier node fails. Speed labels are probe-measured tok/s (blank when unmeasured). First hop = current default member. Dashed node = member not marked free-pool.',tierMapEmpty:'No free-* tier routes yet (/api/gateway-catalog returned no member pools)',tierTok:'tok/s',tierNoTok:'unmeasured',tierFirst:'first hop',tierPaid:'Paid-channel member (not guaranteed free)',tierOfflineCh:'Channel disabled / unreachable',
  sConfigured:'Configured · ••••••••',sMissing:'Missing · ————',swEnabled:'Enabled',swPaused:'Paused',swUnknown:'Unknown',sUnknown:'Unknown · ————',
  toastBaseSaved:'API base saved',toastKeyStored:'Observer credential stored locally',toastKeyCleared:'Observer credential cleared',toastPartial:'Refresh completed with partial errors',toastRefreshed:'Data refreshed',
  toastSwUnknown:'Gateway enabled state is unknown.',confirmResume:'Resume API forwarding?',confirmPause:'Pause API forwarding?',toastGwOn:'Gateway enabled',toastGwOff:'Gateway paused',toastToggleFail:'Toggle failed: '
@@ -1413,7 +1447,7 @@ function renderNav(){
 }
 function navigate(view){if(!NAV.some(n=>n[0]===view))view='dashboard';location.hash='#/'+view}
 function routeFromHash(){const v=(location.hash||'#/dashboard').replace(/^#\//,'').split(/[/?]/)[0];return NAV.some(n=>n[0]===v)?v:'dashboard'}
-function renderRoute(){state.active=routeFromHash();$$('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===state.active));$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.nav===state.active));if(state.active==='dashboard')renderDashboard();if(state.active==='catalog')renderCatalog();if(state.active==='routes')renderRoutes();if(state.active==='channels')renderChannels();if(state.active==='logs')renderLogs();if(state.active==='analytics')renderAnalytics();if(state.active==='probes')renderProbes();if(state.active==='settings')renderSettings();if(state.active==='modeltest')renderModelTest();}
+function renderRoute(){state.active=routeFromHash();$$('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===state.active));$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.nav===state.active));if(state.active==='dashboard')renderDashboard();if(state.active==='catalog')renderCatalog();if(state.active==='routes'){renderRoutes();renderTierMap()}if(state.active==='channels')renderChannels();if(state.active==='logs')renderLogs();if(state.active==='analytics')renderAnalytics();if(state.active==='probes')renderProbes();if(state.active==='settings')renderSettings();if(state.active==='modeltest')renderModelTest();}
 /* 2026-09-18: 目录与路由已对齐清空。aliases() 仍取两者并集（重建时目录先于路由落地，
    必须让"只有目录、还没配路由"的别名也能出现在编排页，否则新建的别名看不到）。
    页面在并集为空时走空状态分支，不再渲染空列表。 */
@@ -1957,6 +1991,50 @@ async function runModelTestNow(){
              <div class="mt-mtext tiny">${esc((r.text||'').slice(0,220))||'（空响应）'}</div>`
             :`<div class="mt-mtext tiny" style="color:#b45309">${esc(r.err)}</div>`}
       </div>`}).join('')}</div>`;
+}
+/* 2026-09-21 三档免费线路由图：free-fast / free-balanced / free-heavy 各渲染一条
+   横向成员链（顺序=members[] 保序=回落顺序）。速度取 /api/model-state 探针实测
+   tok_s_p50（probesData 已有则复用，无则现场拉一次，免鉴权）。节点状态只做静默
+   视觉降级（渠道未启用/不可达→半透明），不做资格推断——资格表在下方 route-plan。 */
+async function renderTierMap(){
+  const box=$('#tierMap');if(!box)return;
+  const cat=state.catalog||{};const routes=cat.routes||{};const catalog=cat.catalog||{};
+  const TIER_ORDER={T1:0,T2:1,T3:2};
+  const names=Object.keys(routes).filter(x=>x&&x.startsWith('free-')).sort((a,b)=>{
+    const ta=TIER_ORDER[(catalog[a]||{}).tier],tb=TIER_ORDER[(catalog[b]||{}).tier];
+    if(ta!=null&&tb!=null&&ta!==tb)return ta-tb;
+    return a.localeCompare(b);
+  });
+  if(!names.length){box.innerHTML=stateBox('014',t('tierMapEmpty'),'');return}
+  /* 探针速度：优先复用探针事实视图已拉的数据；否则裸 fetch（/api/model-state 免鉴权） */
+  if(!probesData){try{const r=await fetch(apiUrl('/api/model-state'),{cache:'no-store'});probesData=await r.json()}catch(e){probesData=null}}
+  const tokOf=(ch,md)=>{const e=probesData&&probesData.channels&&probesData.channels[ch]&&probesData.channels[ch][md];const v=e&&(e.performance||{}).tok_s_p50;return v==null?null:v};
+  const chLive=cid=>{const h=healthObj(cid);return h.enabled!==false&&h.key_set!==false&&h.reachable!==false};
+  const MAXTOK=170; /* 速度柱宽基准：探针全榜最高 groq/compound 166 tok/s */
+  box.innerHTML=names.map(name=>{
+    const route=routes[name]||{};const c=catalog[name]||{};const members=Array.isArray(route.members)?route.members.filter(Boolean):[];
+    const meta=[`<div class="tier-meta"><span class="tier-name">${esc(c.display||name)}</span><span class="tier-tag">${esc(name)}${c.tier?' · '+esc(c.tier):''} · ${members.length} ${LANG==='zh'?'个成员':'members'}</span>${c.use?`<span class="tier-use">${esc(c.use)}</span>`:''}</div>`].join('');
+    if(!members.length)return `<div class="tier-row">${meta}<div class="muted tiny">${t('tierMapEmpty')}</div></div>`;
+    const nodes=members.map((m,i)=>{
+      const tok=tokOf(m.channel,m.model);
+      const live=chLive(m.channel);
+      const free=!(c.billing&&typeof c.billing==='object'&&c.billing.class&&c.billing.class!=='free');
+      const cls='tier-node'+(i===0?' primary':'')+(!live?' offline':'')+((m.channel==='bai')?' paid':'');
+      let tokHtml;
+      if(tok!=null){
+        const w=Math.max(10,Math.min(46,tok/MAXTOK*46));
+        tokHtml=`<div class="n-tok"><span class="bar" style="width:${w.toFixed(0)}px"></span><span class="v">${tok.toFixed(1)}</span><span class="u">${t('tierTok')}</span></div>`;
+      }else{
+        tokHtml=`<div class="n-tok"><span class="u">${t('tierNoTok')}</span></div>`;
+      }
+      const tip=[i===0?t('tierFirst'):null,m.channel==='bai'?t('tierPaid'):null,!live?t('tierOfflineCh'):null].filter(Boolean).join(' · ');
+      return `<div class="${cls}"${tip?` title="${esc(tip)}"`:''}><div class="n-ch"><i></i>${esc(m.channel)}</div><div class="n-md">${esc(m.model||'—')}</div>${tokHtml}</div>`;
+    });
+    const chain=nodes.join('<div class="tier-edge" aria-hidden="true"></div>');
+    const first=members[0]||{};
+    const note=`<div class="tier-first-note">${LANG==='zh'?'首跳':'First hop'}: <b>${esc(first.channel)} / ${esc(first.model||'')}</b> · 共 ${members.length} ${LANG==='zh'?'级回落':'hops'}${LANG==='zh'?' · 从左到右逐级回落':' · fallback walks left to right'}</div>`;
+    return `<div class="tier-row">${meta}<div class="tier-chain">${chain}</div>${note}</div>`;
+  }).join('');
 }
 function renderRoutes(){
   const a=aliases();$('#routeAlias').innerHTML=a.map(x=>`<option ${x===state.routeAlias?'selected':''} value="${esc(x)}">${esc(x)}</option>`).join('');if(!a.length){$('#routeDetail').innerHTML=stateBox('010',t('sbNoRoutesT'),t('sbNoRoutesC'));return}
