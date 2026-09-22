@@ -701,8 +701,24 @@ def route_completion(payload, tenant=None):
             chain = [(_pin, _real or model)]
         source = "pinned"
 
+    # 额度警戒闸门预过滤（2026-09-22）：被拦候选整段剔出回落链（而非循环内跳过），
+    # 使放行候选的 is_last 判定成立——ark 这类白名单末位渠道不再吃 3s TTFT 守卫。
+    # attempted 记录仍用过滤前的链（预过滤剔除在 failures 里留痕）；循环内的
+    # 同名检查保留，兜住 _pin 构造出的链外单元素链。
+    _pre_guard_chain = list(chain)
+    _gq_failures = []
+    _kept = []
+    for _c, _m in chain:
+        _gq = quota_guard.blocked(_c, _m)
+        if _gq is None:
+            _kept.append((_c, _m))
+        else:
+            _gq_failures.append({"channel": _c, "outcome": _gq[0],
+                                 "detail": "quota-guard: 预过滤剔除"})
+    chain = _kept
+
     # 构建路由日志入口（记录 attempted 和 resolved，稍后补 full 信息）
-    attempted = [cid for cid, _ in chain]
+    attempted = [cid for cid, _ in _pre_guard_chain]
     t_id = (tenant or {}).get("id", "master")
     t_name = (tenant or {}).get("name", "Master Admin")
     log_entry = {
@@ -712,13 +728,13 @@ def route_completion(payload, tenant=None):
         "tenant_name": t_name,
         "route_source": source,
         "attempted": attempted,
-        "attempted_class": _peek_chain(chain),  # 纯观测：不参与判定
+        "attempted_class": _peek_chain(_pre_guard_chain),  # 纯观测：不参与判定（含被闸门剔除的候选）
         "resolved_channel": None,
         "resolved_model": None,
         "resolved_class": None,
         "fallback_count": 0,
         "errors": [],
-        "failures": [],
+        "failures": list(_gq_failures),  # 预过滤剔除留痕
     }
 
     errors = []

@@ -101,6 +101,11 @@ def blocked(cid, model):
                 remaining = float(rec.get("remaining", total) or 0)
             except (TypeError, ValueError):
                 return ("guard_bad_record", cid)
+            # 最低额度门槛（郭老师 2026-09-22「必须要大于250万才考虑」）：
+            # 总免费额度 ≤ min_total 的模型即使登记也拒，防止小额度包烧穿
+            min_total = ch.get("min_total")
+            if min_total is not None and total <= float(min_total):
+                return ("guard_below_min_total", cid)
             if rec.get("blocked") is True or (total > 0 and remaining / total <= _warn_pct(ch, doc) / 100.0):
                 return ("guard_quota_warnline", cid)
         return None
