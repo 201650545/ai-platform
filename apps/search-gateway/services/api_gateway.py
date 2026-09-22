@@ -799,10 +799,12 @@ def route_completion(payload, tenant=None):
                 log_entry["errors"] = list(errors)
                 log_entry["failures"] = list(failures)
                 continue
-            # TTFT 3 秒超时无感守卫：非末尾备选渠道且未单选锁定，启用首字 3.0s 守卫线
+            # TTFT 3 秒超时无感守卫：非末尾备选渠道且未单选锁定，启用首字 3.0s 守卫线；
+            # 链尾/锁定渠道改用 request_deadline_s（9-22：硬编码 30s 会掐死 mimo-web 等深思型网页桥）
             is_last = (i >= len(chain) - 1)
             use_ttft = (not is_last) and (_pin is None)
-            ttft_limit = float(os.environ.get("GATEWAY_TTFT_TIMEOUT", "3.0")) if use_ttft else 30.0
+            ttft_limit = (float(os.environ.get("GATEWAY_TTFT_TIMEOUT", "3.0")) if use_ttft
+                          else float(fault_domains.config().get("request_deadline_s", 180)))
 
             resp = channels.chat_completion(cid, p2, route_info=dict(log_entry), timeout=ttft_limit)
             used_key = getattr(resp, '_key', '')  # P0-2：保存实际使用的 key，避免后续 reassign 丢失

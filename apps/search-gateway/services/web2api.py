@@ -44,9 +44,9 @@ ADAPTERS = {
         "session": "mimoweb",
         "page": "https://aistudio.xiaomimimo.com/",
         "origin_check": "aistudio.xiaomimimo.com",
-        "models": [],
-        "default_model": None,
-        "note": "MiMo Studio 网页版（待郭老师登录后抓模型与端点再启用）",
+        "models": ["mimo-v2.6-pro", "mimo-v2.6-flash"],
+        "default_model": "mimo-v2.6-pro",
+        "note": "MiMo Studio 网页版（登录态）：钩子抓 ph + 自动代发 UI 消息刷新会话；仅 pro/flash 实测可调（ultraspeed-studio 上游报模型名称错误）",
     },
 }
 
@@ -243,6 +243,164 @@ def qwen_iter_sse(cid, model, prompt, session):
         qwen_del_chat_async(cid, session)
 
 
+# ---------------------------------------------------------------- MiMo 适配器
+
+# ph 机制（2026-09-22 实测破译）：SPA 每会话随机生成 16B ph，经 401→serviceLogin→sts
+# 链绑定到 httpOnly 会话；跨域 fetch 走不完 SSO（CORS），故适配器不复算 ph，而是
+# ①常驻钩子抓 SPA 真实请求里的 ph ②没有/失效时自动代发一条 UI 消息触发 SPA 自愈
+MIMO_HOOK = ("(()=>{if(window.__mimo_ph_hook)return JSON.stringify({ok:true,ph:window.__mimo_ph||null});"
+             "window.__mimo_ph_hook=true; const of=window.fetch;"
+             "window.fetch=function(...args){try{let url=typeof args[0]==='string'?args[0]:(args[0]&&args[0].url);"
+             "const m=String(url).match(/bot\\/chat\\?xiaomichatbot_ph=([^&]+)/);"
+             "if(m)window.__mimo_ph=decodeURIComponent(m[1]);}catch(e){} return of.apply(this,args);};"
+             "return JSON.stringify({ok:true,ph:window.__mimo_ph||null});})()")
+
+MIMO_GETPH = "(()=>JSON.stringify({ph:window.__mimo_ph||null}))()"
+
+MIMO_UISEND = ("(()=>{const ta=document.querySelector('textarea'); if(!ta)return JSON.stringify({err:'no ta'});"
+               "const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+               "set.call(ta,__TEXT__); ta.dispatchEvent(new Event('input',{bubbles:true}));"
+               "let container=ta,btn=null;"
+               "for(let i=0;i<6&&container.parentElement;i++){container=container.parentElement;"
+               "const b=[...container.querySelectorAll('button')].filter(x=>!x.disabled&&x.querySelector('svg'));"
+               "if(b.length>=2){btn=b[b.length-1];break;}}"
+               "if(!btn)return JSON.stringify({err:'no btn'}); btn.click();"
+               "return JSON.stringify({sent:true});})()")
+
+MIMO_START = ("(()=>{const job='__JOB__'; const ph=window.__mimo_ph||''; if(!ph)return JSON.stringify({err:'no ph'});"
+              "window.__m2a=window.__m2a||{}; window.__m2a[job]={lines:[],done:false};"
+              "const body={msgId:Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join(''),"
+              "conversationId:Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join(''),"
+              "query:__PROMPT__,isEditedQuery:false,"
+              "modelConfig:{enableThinking:false,webSearchStatus:'disabled',model:__MODEL__},multiMedias:[]};"
+              "const ctl=new AbortController(); window.__m2a[job].ctl=ctl;"
+              "setTimeout(()=>ctl.abort().catch(()=>{}),180000);"
+              "(async()=>{try{"
+              "const r=await fetch('/open-apis/bot/chat?xiaomichatbot_ph='+encodeURIComponent(ph),"
+              "{method:'POST',credentials:'include',signal:ctl.signal,"
+              "headers:{'Content-Type':'application/json','x-timeZone':'Asia/Shanghai','Accept-Language':'system'},"
+              "body:JSON.stringify(body)});"
+              "if(!r.ok){const t=await r.text().catch(()=>'');"
+              "window.__m2a[job].lines.push(JSON.stringify({m2a_err:r.status,raw:t.slice(0,200)}));"
+              "window.__m2a[job].done=true;return;}"
+              "const reader=r.body.getReader(); const dec=new TextDecoder(); let buf='';"
+              "while(true){const {done,value}=await reader.read(); if(done)break;"
+              "buf+=dec.decode(value,{stream:true}); let idx;"
+              "while((idx=buf.indexOf('\\n\\n'))>=0){const ev=buf.slice(0,idx); buf=buf.slice(idx+2);"
+              "const em=ev.match(/^event:(.+)$/m); const dm=ev.match(/^data:(.*)$/m);"
+              "window.__m2a[job].lines.push(JSON.stringify({e:em?em[1].trim():'',d:dm?dm[1]:''}));}}"
+              "}catch(e){window.__m2a[job].lines.push(JSON.stringify({m2a_err:'fetch',raw:String(e)}));}"
+              "window.__m2a[job].done=true;})();"
+              "return JSON.stringify({started:true,job:job});})()")
+
+MIMO_POLL = ("(()=>{const j=(window.__m2a||{})['__JOB__']; if(!j)return JSON.stringify({err:'nojob'});"
+             "const take=j.lines.splice(0,j.lines.length);"
+             "return JSON.stringify({n:take.length,lines:take,done:!!j.done});})()")
+
+
+MIMO_CLICK_SEND = ("(()=>{const ta=document.querySelector('textarea'); if(!ta)return JSON.stringify({err:'no ta'});"
+                   "let container=ta,btn=null;"
+                   "for(let i=0;i<6&&container.parentElement;i++){container=container.parentElement;"
+                   "const b=[...container.querySelectorAll('button')].filter(x=>!x.disabled&&x.querySelector('svg'));"
+                   "if(b.length>=2){btn=b[b.length-1];break;}}"
+                   "if(!btn)return JSON.stringify({err:'no btn'}); btn.click();"
+                   "return JSON.stringify({sent:true});})()")
+
+
+def mimo_ensure_ph(session, timeout_s=70):
+    """读钩子里的 ph；没有就 CDP type + 点发送按钮代发一条 UI 消息，
+    等真实请求出现后钩子即捕获 ph（SPA 会话失效时会顺带自愈走 SSO）。"""
+    res = ocli_eval(session, MIMO_HOOK)
+    if res.get("ph"):
+        return res["ph"]
+    ocli("browser", session, "type", "textarea", "ping", timeout=40)
+    clicked = ocli_eval(session, MIMO_CLICK_SEND)
+    if not clicked.get("sent"):
+        raise RuntimeError("点发送按钮失败：%s" % json.dumps(clicked, ensure_ascii=False)[:150])
+    t0 = time.time()
+    while time.time() - t0 < timeout_s:
+        time.sleep(1.2)
+        got = ocli_eval(session, MIMO_GETPH)
+        if got.get("ph"):
+            return got["ph"]
+        # SSO 导航会重置 window：钩子没了就重装再来一轮
+        re_hook = ocli_eval(session, MIMO_HOOK)
+        if not re_hook.get("ok"):
+            continue
+        if re_hook.get("ph"):
+            return re_hook["ph"]
+    raise RuntimeError("等待 ph 超时（页面未产生 bot/chat 请求）")
+
+
+def mimo_iter_sse(model, prompt, session):
+    """yield (delta_text, None)。MiMo 把思考段以 <think>…</think> 内嵌在正文流里
+    （enableThinking 关不掉），故持有首段直到 </think> 出现再吐答案段增量。"""
+    mimo_ensure_ph(session)
+    job = uuid.uuid4().hex[:12]
+    js = (MIMO_START.replace("__JOB__", job)
+          .replace("__MODEL__", json.dumps(model))
+          .replace("__PROMPT__", json.dumps(prompt, ensure_ascii=False)))
+    res = ocli_eval(session, js)
+    if res.get("err"):
+        raise RuntimeError("start 失败：%s" % json.dumps(res, ensure_ascii=False)[:150])
+    raw = ""
+    sent = 0
+    in_answer = False
+    t0 = time.time()
+    while True:
+        pr = ocli_eval(session, MIMO_POLL.replace("__JOB__", job))
+        lines = pr.get("lines", []) if not pr.get("err") else []
+        done = bool(pr.get("done"))
+        for ln in lines:
+            try:
+                ev = json.loads(ln)
+            except Exception:  # noqa: BLE001
+                continue
+            if "m2a_err" in ev:
+                raise RuntimeError("上游错误 %s：%s" % (ev["m2a_err"], ev.get("raw", "")))
+            if ev.get("e") == "error":
+                try:
+                    detail = json.loads(ev.get("d") or "{}").get("content", "")
+                except Exception:  # noqa: BLE001
+                    detail = ev.get("d", "")
+                raise RuntimeError("上游 error 事件：%s" % (detail or "unknown"))
+            if ev.get("e") != "message":
+                continue
+            try:
+                payload = json.loads(ev.get("d") or "{}")
+            except Exception:  # noqa: BLE001
+                continue
+            if payload.get("type") != "text":
+                continue
+            raw += payload.get("content", "")
+            if not in_answer:
+                if "</think>" in raw:
+                    raw = raw.split("</think>", 1)[1]
+                    sent = 0
+                    in_answer = True
+                elif "<think>" in raw:
+                    continue  # 思考段未闭合，继续持有
+                elif len(raw) > 0 and not raw.lstrip().startswith("<"):
+                    in_answer = True  # 无思考段的纯答案流
+        if in_answer:
+            out = raw.replace("\x00", "")
+            if len(out) > sent:
+                yield out[sent:], None
+                sent = len(out)
+        if done:
+            if not in_answer and raw:
+                # 流结束仍困在思考段：正则剥离后兜底吐出
+                import re as _re
+                out = _re.sub(r"<think>[\s\S]*?</think>", "", raw).replace("\x00", "")
+                if out:
+                    yield out, None
+            return
+        if time.time() - t0 > 170:
+            raise RuntimeError("收割超时")
+        if not lines:
+            time.sleep(0.35)
+
+
 # ---------------------------------------------------------------- OpenAI 壳
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -311,10 +469,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not got:
             return self._json(429, {"error": "浏览器桥忙（单飞行并发），请稍后"})
         try:
+            it_fn = mimo_iter_sse if cid == "mimo-web" else (
+                lambda m, p, s: qwen_iter_sse(None, m, p, s))
             if not stream:
                 chunks = []
                 usage = None
-                for delta, u in qwen_iter_sse(None, model, prompt, ad["session"]):
+                for delta, u in it_fn(model, prompt, ad["session"]):
                     chunks.append(delta)
                     if u:
                         usage = u
@@ -338,7 +498,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                   "model": full_model,
                   "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": None}]})
             usage = None
-            for delta, u in qwen_iter_sse(None, model, prompt, ad["session"]):
+            for delta, u in it_fn(model, prompt, ad["session"]):
                 if not delta:
                     if u:
                         usage = u
