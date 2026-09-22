@@ -98,16 +98,16 @@ CHANNELS = {
         "name": "硅基流动 SiliconFlow",
         "provider": "硅基流动 (api.siliconflow.cn)",
         "billing_type": "free_quota",
-        "billing_tag": "🟢 赠送额度 + 免费模型",
+        "billing_tag": "🟢 赠金限定名单",
         "icon": "/img/brand/siliconflow.png",
         "base_url": "https://api.siliconflow.cn/v1",
         "env_key": "",
         "free": True,
-        
+
         "speed": "fast",
-        "default_model": "deepseek-ai/DeepSeek-V3",
-        "models": ["deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-7B-Instruct", "THUDM/glm-4-9b-chat"],
-        "note": "注册赠送 ￥14 额度，含免费开箱模型。",
+        "default_model": "deepseek-ai/DeepSeek-V3.2",
+        "models": ["deepseek-ai/DeepSeek-V3.2", "deepseek-ai/DeepSeek-V3.1-Terminus", "Qwen/Qwen3.5-35B-A3B", "Qwen/Qwen3.5-27B", "Qwen/Qwen3.5-9B", "deepseek-ai/DeepSeek-R1", "deepseek-ai/DeepSeek-V3", "Qwen/Qwen3-VL-32B-Instruct", "Qwen/Qwen3-VL-32B-Thinking", "Qwen/Qwen3-VL-8B-Instruct", "Qwen/Qwen3-VL-8B-Thinking", "Qwen/Qwen3-VL-30B-A3B-Instruct", "Qwen/Qwen3-VL-30B-A3B-Thinking", "Qwen/Qwen3-Omni-30B-A3B-Instruct", "Qwen/Qwen3-Omni-30B-A3B-Thinking", "Qwen/Qwen3-Omni-30B-A3B-Captioner", "inclusionAI/Ling-flash-2.0", "inclusionAI/Ling-mini-2.0", "Qwen/Qwen-Image-Edit-2509", "Qwen/Qwen-Image-Edit", "Qwen/Qwen-Image", "ByteDance-Seed/Seed-OSS-36B-Instruct", "Wan-AI/Wan2.2-I2V-A14B", "Wan-AI/Wan2.2-T2V-A14B", "zai-org/GLM-4.5V", "zai-org/GLM-4.5-Air", "Qwen/Qwen3-Coder-30B-A3B-Instruct", "Qwen/Qwen3-30B-A3B-Instruct-2507", "tencent/Hunyuan-A13B-Instruct", "Qwen/Qwen3-32B", "Qwen/Qwen3-14B", "Qwen/Qwen3-Reranker-8B", "Qwen/Qwen3-Embedding-8B", "Qwen/Qwen3-Reranker-4B", "Qwen/Qwen3-Embedding-4B", "Qwen/Qwen3-Reranker-0.6B", "Qwen/Qwen3-Embedding-0.6B", "THUDM/GLM-4-32B-0414", "fnlp/MOSS-TTSD-v0.5", "FunAudioLLM/CosyVoice2-0.5B", "Qwen/Qwen2.5-72B-Instruct", "Qwen/Qwen2.5-32B-Instruct", "Qwen/Qwen2.5-7B-Instruct", "Pro/BAAI/bge-m3", "Pro/BAAI/bge-reranker-v2-m3", "Pro/Qwen/Qwen2.5-7B-Instruct", "LoRA/Qwen/Qwen2.5-7B-Instruct", "LoRA/Qwen/Qwen2.5-14B-Instruct", "LoRA/Qwen/Qwen2.5-32B-Instruct", "LoRA/Qwen/Qwen2.5-72B-Instruct"],
+        "note": "赠金限定名单（郭老师 2026-09-22 提供共 50 个，仅这些可调用）。2026-09-22 郭老师充值后全名单实测可用（V3.2 2.4s/Ling-flash 0.8s/CosyVoice2 TTS OK），CosyVoice2 已入 voice-tts 链第2席。",
     },
     "zhipu": {
         "name": "智谱 GLM BigModel",
@@ -963,21 +963,30 @@ def _augment_health(cid, st):
     return st
 
 
+_refresh_inflight = set()
+
+
 def cached_health_all(ttl=60):
-    """带 TTL 的渠道健康缓存；过期渠道并发惰性刷新，避免串行网络探测阻塞启动。"""
+    """带 TTL 的渠道健康缓存（stale-while-revalidate）：
+    - 有旧值但过期 → 立即返回旧值，后台线程刷新（不阻塞前端刷新，2026-09-21 前端慢刷新修复）
+    - 从未探测 → 才阻塞并发探测（warm_start 启动预热后正常为空）
+    """
     now = time.time()
     out = {}
     stale = []
+    never = []
     with _cache_lock:
         for cid in ordered_channels():
             hit = _health_cache.get(cid)
-            if hit and now - hit[0] < ttl:
+            if hit:
                 out[cid] = _augment_health(cid, hit[1])
+                if now - hit[0] >= ttl:
+                    stale.append(cid)
             else:
-                stale.append(cid)
-    if stale:
-        # 并发探测各渠道，互不阻塞
+                never.append(cid)
+    if never:
         results = {}
+
         def _probe(cid):
             try:
                 results[cid] = channel_health(cid)
@@ -985,17 +994,34 @@ def cached_health_all(ttl=60):
                 results[cid] = {"id": cid, "name": cid, "icon": "🤖", "key_set": False,
                                 "reachable": False, "models": [], "error": "探测异常",
                                 "can_fill": True, "provider": "", "billing_tag": "", "balance": "未知"}
-        threads = [threading.Thread(target=_probe, args=(cid,), daemon=True) for cid in stale]
+        threads = [threading.Thread(target=_probe, args=(cid,), daemon=True) for cid in never]
         for t in threads:
             t.start()
         for t in threads:
             t.join(timeout=15)
         with _cache_lock:
-            for cid in stale:
+            for cid in never:
                 r = results.get(cid)
                 if r is not None:
                     _health_cache[cid] = (time.time(), r)
                     out[cid] = _augment_health(cid, r)
+    if stale:
+        todo = [cid for cid in stale if cid not in _refresh_inflight]
+        if todo:
+            for cid in todo:
+                _refresh_inflight.add(cid)
+
+            def _bg(cids):
+                for cid in cids:
+                    try:
+                        r = channel_health(cid)
+                    except Exception:  # noqa: BLE001
+                        r = None
+                    with _cache_lock:
+                        if r is not None:
+                            _health_cache[cid] = (time.time(), r)
+                        _refresh_inflight.discard(cid)
+            threading.Thread(target=_bg, args=(todo,), daemon=True).start()
     return out
 
 
@@ -1185,9 +1211,10 @@ class _QuotaResponse:
             pass
 
 
-def chat_completion(channel_id, payload, route_info=None):
+def chat_completion(channel_id, payload, route_info=None, timeout=None):
     """转发 chat/completions 到指定渠道。返回 _QuotaResponse（urllib 兼容 + 记录额度）。
     route_info 可选，透传路由决策信息供响应头使用。
+    timeout 可选，用于首字/连接超时控制（TTFT 守卫）。
     配置了 key_pools 时，遇 429 自动换下一把 key 重试，最多轮完一圈。
     限流准入（task_045）：每次真实 HTTP attempt 前原子 try_acquire 预占配额——
     key 池轮一圈是 N 次上游请求就预占 N 次；某把 key 的桶满/熔断只跳过该 key，
@@ -1209,6 +1236,7 @@ def chat_completion(channel_id, payload, route_info=None):
     attempts = max(1, get_key_pool_size(channel_id))
     last_err = None
     acquired_any = False
+    req_timeout = timeout if timeout is not None else 300
     for i in range(attempts):
         key = get_key(channel_id)  # 每圈取下一把（get_key 内部轮换）
         if _rate_limit is not None and not _rate_limit.try_acquire(channel_id, model, key):
@@ -1223,7 +1251,7 @@ def chat_completion(channel_id, payload, route_info=None):
             headers["Accept"] = "text/event-stream"
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         try:
-            resp = _urlopen(req, timeout=300, channel_id=channel_id)
+            resp = _urlopen(req, timeout=req_timeout, channel_id=channel_id)
         except urllib.error.HTTPError as he:
             if _rate_limit is not None:
                 ra = (he.headers or {}).get("Retry-After") if he.headers else None
@@ -1274,6 +1302,16 @@ def record_channel_success(channel_id, model, key):
             _rate_limit.record_result(channel_id, model, key, 200)
     except Exception:  # noqa: BLE001
         pass
+
+
+def is_channel_rate_limited(channel_id, model=None):
+    """查询指定渠道当前是否正处于 429 熔断期内。供路由决策做自适应切流。"""
+    if _rate_limit is None:
+        return False
+    try:
+        return _rate_limit.is_channel_blocked(channel_id, model)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def model_to_chain(model):

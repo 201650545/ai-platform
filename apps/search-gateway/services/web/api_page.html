@@ -107,6 +107,10 @@ html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font
 html{scroll-behavior:smooth}
 body{min-height:100vh;overflow-x:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.85}
+:root[data-theme="dark"] input::placeholder,:root[data-theme="dark"] textarea::placeholder{color:rgba(255,255,255,.45) !important;opacity:1 !important}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,textarea:-webkit-autofill{
+  -webkit-text-fill-color:var(--ink) !important;-webkit-box-shadow:0 0 0 1000px var(--paper) inset !important;transition:background-color 5000s ease-in-out 0s}
 button{cursor:pointer}
 a{color:inherit}
 ::selection{background:var(--ink);color:var(--inverse)}
@@ -172,23 +176,54 @@ a{color:inherit}
 .view.active{display:block}
 /* 探针视图：main 是固定高容器（calc(100vh-126px)），view-head 的 179px
    会把数据区挤到 344px。sub 段落与探针页自身页脚重复，隐藏它并收紧间距。 */
-#view-probes .view-sub{display:none}
-#view-probes .view-head{padding:10px 0 16px}
-/* 探针原生渲染（无 iframe）：工具栏沿用 console 单色语法；汇总为纯文字+hairline */
-.probes-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
-.probes-toolbar input[type=search]{flex:1;min-width:200px;max-width:380px;background:transparent;border:1px solid var(--line);border-radius:2px;padding:9px 12px;font-size:11.5px;color:var(--ink);outline:none;font-family:inherit}
-.probes-toolbar input[type=search]:focus{border-color:var(--ink)}
-.probes-toolbar input[type=search]::placeholder{color:var(--muted)}
-#probesFilters{display:flex;gap:6px;flex-wrap:wrap}
-.probes-chan{margin:0 0 26px}
-.probes-chan-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
-.probes-chan-head h3{font-size:12px;font-weight:600;letter-spacing:.06em;margin:0}
-.probes-chan-head .cnt{color:var(--muted);font-size:9.5px;letter-spacing:.06em}
-.probes-chan-head .bar{flex:1;min-width:80px;max-width:180px;height:3px;background:var(--line-2);border-radius:0;position:relative;overflow:hidden}
-.probes-chan-head .bar i{position:absolute;inset:0 auto 0 0;background:var(--ink)}
+/* 模型实测大盘（原探针事实）：视觉紧凑度与控制台硬件面板规范 */
+#view-probes .view-sub{display:block;max-width:760px;font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:6px}
+#view-probes .view-head{padding:12px 0 18px}
 .probes-summary-k{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .probes-summary-v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.3}
 .probes-summary-v small{font-size:9px;color:var(--muted);font-weight:400;letter-spacing:.08em}
+
+/* 复合筛选控制台 */
+.probes-console{position:relative;background:var(--card-sub);border:1px solid var(--line-2);border-radius:var(--r-md);padding:14px 16px;margin:0 0 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 8px 24px rgba(0,0,0,.08);display:flex;flex-direction:column;gap:12px}
+.probes-console-primary{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.probes-search-wrap{position:relative;flex:1;min-width:240px;max-width:440px}
+.probes-search-wrap input[type=search]{width:100%;height:34px;background:var(--card-bg);border:1px solid var(--line-2);border-radius:var(--r-xs);padding:0 12px 0 30px;font-size:12px;color:var(--ink);outline:none;font-family:inherit;transition:border-color .2s ease}
+.probes-search-wrap input[type=search]:focus{border-color:var(--ink);box-shadow:0 0 0 2px rgba(16,185,129,.12)}
+.probes-search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;pointer-events:none}
+.probes-view-toggle{display:inline-flex;align-items:center;padding:2px;background:var(--card-bg);border:1px solid var(--line-2);border-radius:var(--r-xs)}
+.probes-v-btn{border:0;background:transparent;color:var(--muted);font-size:11px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .18s ease}
+.probes-v-btn:hover{color:var(--ink)}
+.probes-v-btn.active{background:var(--card-sub);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.probes-count-badge{font-size:11px;font-family:var(--font-mono);color:var(--muted);margin-left:auto;white-space:nowrap}
+.probes-count-badge b{color:var(--ink);font-weight:700}
+.probes-reset-btn{border:1px solid var(--line-2);background:transparent;color:var(--muted);font-size:11px;padding:4px 10px;border-radius:var(--r-xs);cursor:pointer;transition:all .18s ease;display:none}
+.probes-reset-btn:hover{color:var(--ink);border-color:var(--ink)}
+.probes-reset-btn.show{display:inline-block}
+
+/* 预设与多维度切面 */
+.probes-console-secondary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line-2)}
+.probes-presets{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.probes-preset-btn{border:1px solid var(--line-2);background:var(--card-bg);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:var(--r-xs);cursor:pointer;transition:all .18s ease}
+.probes-preset-btn:hover{color:var(--ink);border-color:var(--line)}
+.probes-preset-btn.active{background:var(--ink);color:var(--inverse);border-color:var(--ink);font-weight:600}
+.probes-facets{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.probes-select-group{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+.probes-select{height:30px;border:1px solid var(--line-2);background:var(--card-bg);padding:0 8px;border-radius:var(--r-xs);font-size:11.5px;color:var(--ink);outline:none;cursor:pointer}
+.probes-select:focus{border-color:var(--ink)}
+
+/* 表格与排序表头 */
+.th-sortable{cursor:pointer;user-select:none;transition:color .18s ease}
+.th-sortable:hover{color:var(--ink)}
+.th-sortable .sort-arrow{display:inline-block;margin-left:3px;font-size:9px;color:var(--muted);opacity:.4}
+.th-sortable.sorted{color:var(--ink)}
+.th-sortable.sorted .sort-arrow{color:#10b981;opacity:1;font-weight:800}
+
+.probes-chan{margin:0 0 24px}
+.probes-chan-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 6px}
+.probes-chan-head h3{font-size:13px;font-weight:700;letter-spacing:.02em;margin:0;color:var(--ink)}
+.probes-chan-head .cnt{color:var(--muted);font-size:10px;letter-spacing:.04em}
+.probes-chan-head .bar{flex:1;min-width:80px;max-width:180px;height:3px;background:var(--line-2);border-radius:0;position:relative;overflow:hidden}
+.probes-chan-head .bar i{position:absolute;inset:0 auto 0 0;background:#10b981}
 /* 2026-09-21 三档免费线路由图（routes 视图）：横向成员链，节点=渠道+上游模型，
    边注=实测 tok/s（探针 tok_s_p50）。单色语法沿用 console tag/dot；速度柱只在有实测值时渲染。 */
 .tiers-wrap{display:flex;flex-direction:column;gap:0}
@@ -244,35 +279,69 @@ a{color:inherit}
 .kpi-bars{position:absolute;right:16px;bottom:17px;width:56px;height:29px;display:flex;align-items:flex-end;gap:3px;opacity:.62}
 .kpi-bars i{width:3px;background:var(--ink);display:block;min-height:2px}
 .kpi-no-series{font-family:var(--font-mono);font-size:7px;letter-spacing:.12em;color:var(--faint);align-self:flex-end;padding-bottom:2px;white-space:nowrap}
-.topology-panel{position:relative;min-height:510px;border-bottom:1px solid var(--line);overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 78%,transparent),color-mix(in srgb,var(--paper) 94%,transparent))}
-.topology-panel::before{content:"";position:absolute;left:-90px;bottom:-105px;width:620px;height:300px;background:url('img/architectural/architecture-hero.png') left bottom/cover no-repeat;filter:grayscale(1) contrast(.86);opacity:.14;mask-image:linear-gradient(90deg,#000,transparent 92%)}
-.topology-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 0;position:relative;z-index:3}
-.topology-title{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
-.alias-picker{border:0;background:transparent;border-bottom:1px solid var(--line);padding:7px 24px 7px 4px;max-width:250px;font-size:12px;outline:none}
-.topology-stage{height:410px;position:relative;z-index:2}
-.topology-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.topology-svg path.route-line{fill:none;stroke:var(--ink);stroke-width:1;opacity:.48;vector-effect:non-scaling-stroke}
-.topology-svg path.route-line.current{stroke-width:1.75;opacity:.92}
-.topology-svg path.route-line.cooldown{stroke-dasharray:5 5;opacity:.62}
-.topology-svg path.route-line.standby{opacity:.22}
-.topology-svg path.route-line.unavailable{opacity:.12}
-.topology-svg path.route-line.filtered{stroke-dasharray:2 5;opacity:.26}
-.topology-svg path.request-line{fill:none;stroke:var(--ink);stroke-width:1.2;opacity:.68}
-.topology-svg .flow-dash{stroke-dasharray:2 7;animation:dash 5s linear infinite}
-@keyframes dash{to{stroke-dashoffset:-54}}
-.request-node,.member-node,.alias-core{position:absolute;transform:translate(-50%,-50%)}
-.request-node{left:12%;top:50%;display:flex;align-items:center;gap:12px}
-.request-dot{width:15px;height:15px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 5px color-mix(in srgb,var(--paper) 86%,transparent)}
-.request-copy{position:absolute;right:25px;bottom:26px;transform:none;white-space:nowrap;text-align:right}
-.request-copy strong{display:block;font-size:13px;font-weight:620}
-.alias-core{left:43%;top:50%;width:152px;height:152px;border-radius:50%;background:radial-gradient(circle at 36% 30%,#4b4b4b 0,#181818 30%,#070707 73%,#000 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 18px 35px rgba(0,0,0,.15)}
-.alias-core .alias-name{font-size:20px;font-weight:700;max-width:126px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.alias-core .alias-meta{font-size:9px;color:#b8b8b8;margin-top:6px;letter-spacing:.08em}
-.member-node{left:78%;display:flex;align-items:center;gap:11px;width:220px}
-.member-dot{width:37px;height:37px;border-radius:50%;background:var(--ink);color:var(--inverse);display:grid;place-items:center;font-size:10px;font-weight:700;letter-spacing:.03em;flex:0 0 37px;border:1px solid color-mix(in srgb,var(--ink) 80%,var(--paper))}
-.member-node.cooldown .member-dot{background:transparent;color:var(--ink);border-style:dashed}
-.member-node.standby{opacity:.45}.member-node.unavailable{opacity:.23}.member-node.filtered{opacity:.38}
-.member-copy{min-width:0}.member-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.member-model{font-family:var(--font-mono);font-size:8.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}.member-state{font-size:8px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-top:4px}
-.topology-caption{position:absolute;left:0;right:0;bottom:3px;display:flex;justify-content:space-between;gap:16px;padding:0 4px;font-size:9px;color:var(--muted);letter-spacing:.05em}
+.topology-panel{position:relative;min-height:500px;border-bottom:1px solid var(--line);overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 85%,transparent),color-mix(in srgb,var(--paper) 95%,transparent))}
+.topology-head{height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--line-2);position:relative;z-index:3}
+.topology-title{font-size:14px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.topology-sub{margin-top:2px;font-size:11px;color:var(--muted);letter-spacing:.04em}
+.alias-picker{border:1px solid var(--line-2);background:var(--card-sub);padding:6px 12px;border-radius:var(--r-xs);font-size:12px;font-family:var(--font-mono);font-weight:600;color:var(--ink);outline:none;cursor:pointer}
+.alias-picker:focus{border-color:var(--ink)}
+.topology-stage{min-height:430px;padding:20px 16px;position:relative;z-index:2;display:flex;align-items:center;overflow-x:auto}
+.topo-pipeline-container{display:grid;grid-template-columns:minmax(150px,175px) minmax(215px,245px) minmax(0,1fr);gap:20px;width:100%;min-height:380px;position:relative;align-items:center}
+.topo-circuit-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.circuit-rail{fill:none;stroke:var(--line-2);stroke-width:1.5;stroke-linecap:round}
+.circuit-rail.rail-ingress{stroke:var(--ink);opacity:.45;stroke-dasharray:4 4;animation:circuitFlow 25s linear infinite}
+.circuit-rail.rail-candidate{opacity:.3}
+.circuit-rail.rail-active{stroke:#10b981;stroke-width:2.2;opacity:.95;filter:drop-shadow(0 0 6px rgba(16,185,129,.4));stroke-dasharray:6 4;animation:circuitFlow 8s linear infinite}
+@keyframes circuitFlow{to{stroke-dashoffset:-200}}
+.topo-col{position:relative;z-index:2;display:flex;flex-direction:column;min-width:0}
+.topo-col-left{justify-content:center}
+.topo-col-center{justify-content:center}
+.topo-col-right{justify-content:flex-start;min-width:0;width:100%}
+.topo-card{position:relative;background:var(--card-sub);border:1px solid var(--line-2);border-radius:var(--r-md);padding:14px 13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 24px rgba(0,0,0,.12);transition:all .2s ease}
+.topo-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.topo-card-tag{font-size:9px;font-family:var(--font-mono);font-weight:700;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.topo-pulse-dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
+.topo-card-ingress .topo-endpoint{font-size:9.5px;background:rgba(0,0,0,.2);border:1px solid var(--line-2);padding:3px 5px;border-radius:var(--r-xs);color:var(--ink);word-break:break-all;margin-bottom:6px}
+.topo-card-ingress .topo-card-title{font-size:12px;font-weight:650;color:var(--ink);margin-bottom:8px}
+.topo-meta-list{display:flex;flex-direction:column;gap:5px;font-size:10px}
+.topo-meta-row{display:flex;justify-content:space-between;color:var(--muted)}
+.topo-meta-row strong{color:var(--ink)}
+.topo-card-router{background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.04) 0%,transparent 75%),var(--card-sub);border-color:var(--line);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 12px 32px rgba(0,0,0,.18)}
+.topo-alias-name{font-size:16.5px;font-weight:750;font-family:var(--font-mono);letter-spacing:-.02em;color:var(--ink);margin-bottom:2px;word-break:break-word}
+.topo-alias-desc{font-size:11px;color:var(--muted);margin-bottom:10px}
+.topo-matrix-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:rgba(0,0,0,.12);padding:8px;border-radius:var(--r-xs);border:1px solid var(--line-2)}
+.topo-matrix-item{display:flex;flex-direction:column;gap:2px}
+.topo-matrix-item .m-lbl{font-size:8.5px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase}
+.topo-matrix-item .m-val{font-size:10px;font-weight:600;color:var(--ink)}
+.topo-upstream-wrap{display:flex;flex-direction:column;gap:8px;width:100%;max-width:540px;min-width:0}
+.topo-upstream-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.topo-upstream-list{display:flex;flex-direction:column;gap:7px;width:100%;min-width:0}
+.topo-upstream-card{position:relative;display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--card-sub);border:1px solid var(--line-2);border-radius:var(--r-xs);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:all .2s ease;min-width:0}
+.topo-upstream-card:hover{border-color:var(--line);transform:translateX(2px)}
+.topo-upstream-card.is-current{border-color:rgba(16,185,129,.55);background:linear-gradient(90deg,rgba(16,185,129,.12),var(--card-sub) 70%);box-shadow:0 0 14px rgba(16,185,129,.14),inset 0 1px 0 rgba(255,255,255,.08)}
+.topo-upstream-card.cooldown{opacity:.65;border-style:dashed}
+.topo-upstream-card.standby{opacity:.45}
+.topo-u-rank{font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 4px;border-radius:3px;background:var(--card-bg);border:1px solid var(--line-2);color:var(--muted);flex-shrink:0}
+.topo-u-rank.now{background:#10b981;color:#fff;border-color:#10b981;font-weight:800;box-shadow:0 0 8px rgba(16,185,129,.5)}
+.topo-u-body{flex:1;min-width:0}
+.topo-u-top{display:flex;align-items:baseline;gap:5px;margin-bottom:1px;min-width:0}
+.topo-u-chan{font-size:11.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topo-u-role{font-size:8.5px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.topo-u-model{font-size:9.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topo-u-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0;white-space:nowrap}
+.topo-u-status{font-size:8.5px;padding:1px 5px;border-radius:3px;border:1px solid var(--line-2);color:var(--muted)}
+.topo-u-status.healthy{color:#10b981;border-color:rgba(16,185,129,.3)}
+.topo-u-status.cooldown{color:#f59e0b;border-color:rgba(245,158,11,.3)}
+.topo-u-speed{font-size:9px;color:var(--ink-2);font-weight:600}
+.topo-more-card{text-align:center;padding:5px;font-size:10px;color:var(--muted);border:1px dashed var(--line-2);border-radius:var(--r-xs);width:100%;box-sizing:border-box}
+.topo-pin{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--card-bg);border:2px solid var(--line);z-index:3}
+.topo-card-ingress .topo-pin-out{right:-4px;top:50%;transform:translateY(-50%)}
+.topo-card-router .topo-pin-in{left:-4px;top:50%;transform:translateY(-50%)}
+.topo-card-router .topo-pin-out{right:-4px;top:50%;transform:translateY(-50%)}
+.topo-upstream-card .topo-pin-in{left:-4px;top:50%;transform:translateY(-50%)}
+.topo-upstream-card.is-current .topo-pin-in{border-color:#10b981;background:#10b981;box-shadow:0 0 6px #10b981}
+.topology-caption{height:34px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line-2);font-size:10.5px;color:var(--muted);position:relative;z-index:3}
 .topology-caption b{font-weight:600;color:var(--ink-2)}
 
 .instrument{border-top:1px solid var(--line);padding:15px 0 18px}
@@ -289,7 +358,7 @@ a{color:inherit}
    双栏空档 ≥44px（路由详情页 ≥96px），表格单元格 ≥18px 16px，行高 ≥ 1.6。 */
 .editor-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:44px}.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}
 .data-sheet{width:100%;border-collapse:collapse;font-size:11.5px}.data-sheet th{text-align:left;color:var(--muted);font-size:8.5px;font-weight:550;letter-spacing:.1em;text-transform:uppercase;padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap}.data-sheet td{padding:18px 16px;border-bottom:1px solid var(--line-2);vertical-align:middle;line-height:1.6}.data-sheet tr:last-child td{border-bottom:0}.data-sheet tbody tr:hover{background:var(--line-2)}.data-sheet code{font-family:var(--font-mono);font-size:10px;word-break:break-word;line-height:1.55}
-.tag{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;line-height:1.3;padding:7px 11px;border:1px solid var(--line);border-radius:2px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap}.tag.solid{background:var(--ink);color:var(--inverse);border-color:var(--ink)}.tag.dim{color:var(--muted);border-style:dashed}.tag.blocked{border-style:double;border-width:3px;padding:3px 5px}.tag.throttled{border-style:dashed}.tag.missing{opacity:.45}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;line-height:1.3;padding:7px 11px;border:1px solid var(--line);border-radius:2px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}.tag.solid{background:var(--ink);color:var(--inverse);border-color:var(--ink)}.tag.dim{color:var(--muted);border-style:dashed}.tag.blocked{border-style:double;border-width:3px;padding:3px 5px}.tag.throttled{border-style:dashed}.tag.missing{opacity:.45}
 /* 2026-09-16 路由管理：资格/健康状态视觉编码（沿用单色 tag 语法） */
 .data-sheet tr.inelig-row td{opacity:.5}
 /* 留白规则（用户 2026-09-17）：表格内状态标签纵向堆叠需留呼吸，不与列边界相贴 */
@@ -320,6 +389,12 @@ a{color:inherit}
 #mtModel{max-width:420px}
 #mtModel option{background:var(--paper);color:var(--ink)}
 :root[data-theme="dark"] #mtModel{color-scheme:dark}
+:root[data-theme="dark"] .mt-search,
+:root[data-theme="dark"] .mt-prompt,
+:root[data-theme="dark"] .mt-trigger{background:rgba(255,255,255,.05) !important;border:1px solid rgba(255,255,255,.16) !important;color:#f0efe9 !important}
+:root[data-theme="dark"] .mt-search:focus,
+:root[data-theme="dark"] .mt-prompt:focus,
+:root[data-theme="dark"] .mt-trigger[aria-expanded="true"]{background:rgba(255,255,255,.09) !important;border-color:rgba(255,255,255,.45) !important;color:#ffffff !important}
 
 /* ============ 2026-09-18 悬浮四级下拉面板 ============
    替代原生 select：点触发器弹出悬浮面板，按厂商分组，选中后自动收起。
@@ -345,7 +420,11 @@ a{color:inherit}
 .mt-panel.open{display:block}
 /* 选项行也要跟着面板宽度走，否则长名字仍被压 */
 .mt-panel .mt-opt{width:100%}
-:root[data-theme="dark"] .mt-panel{box-shadow:0 14px 36px rgba(0,0,0,.6),0 2px 10px rgba(0,0,0,.4)}
+:root[data-theme="dark"] .mt-panel{background:#1a1a19 !important;border:1px solid rgba(255,255,255,.18) !important;box-shadow:0 16px 48px rgba(0,0,0,.7) !important}
+:root[data-theme="dark"] .mt-grp{background:#1a1a19 !important;color:rgba(255,255,255,.5) !important}
+:root[data-theme="dark"] .mt-opt{color:#f0efe9 !important}
+:root[data-theme="dark"] .mt-opt:hover,:root[data-theme="dark"] .mt-opt.hl{background:rgba(255,255,255,.1) !important;color:#ffffff !important}
+:root[data-theme="dark"] .mt-opt[aria-selected="true"]{background:rgba(255,255,255,.16) !important;color:#ffffff !important}
 
 /* 厂商分组标题：小字号、字距拉开、粘性吸顶 */
 .mt-grp{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;
@@ -380,8 +459,12 @@ a{color:inherit}
   border-radius:var(--r-md);color:var(--muted);text-align:center}
 .mt-re-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;
   border:1px solid var(--line);border-radius:var(--r-full);font-size:11px;color:var(--faint)}
-.mt-re-t{font-size:12px;color:var(--ink-2)}
-.mt-re-s{font-size:9.5px;line-height:1.7;color:var(--muted);max-width:300px}
+.mt-re-t{font-size:13px;font-weight:600;color:var(--ink)}
+.mt-re-s{font-size:11px;line-height:1.7;color:var(--muted);max-width:320px}
+:root[data-theme="dark"] .mt-result-empty{background:rgba(255,255,255,.02) !important;border-color:rgba(255,255,255,.14) !important}
+:root[data-theme="dark"] .mt-re-t{color:#ffffff !important}
+:root[data-theme="dark"] .mt-re-s{color:rgba(255,255,255,.6) !important}
+:root[data-theme="dark"] .mt-re-icon{border-color:rgba(255,255,255,.25) !important;color:rgba(255,255,255,.7) !important}
 /* 结果正文区：限高+滚动，避免长回复把页面撑变形 */
 #mtResult .mt-out{max-height:360px;overflow:auto}
 
@@ -404,7 +487,8 @@ a{color:inherit}
 .mt-mode{flex:1;padding:8px 12px;border:0;background:transparent;color:var(--muted);
   font-family:inherit;font-size:10.5px;cursor:pointer;letter-spacing:.02em}
 .mt-mode+.mt-mode{border-left:1px solid var(--line)}
-.mt-mode[aria-pressed="true"]{background:color-mix(in srgb,var(--ink) 88%,transparent);color:#121212;font-weight:600}
+.mt-mode[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:600}
+:root[data-theme="dark"] .mt-mode[aria-pressed="true"]{background:rgba(255,255,255,.16) !important;color:#ffffff !important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25) !important}
 .mt-mode:hover[aria-pressed="false"]{color:var(--ink-2);background:color-mix(in srgb,var(--ink) 5%,transparent)}
 
 /* 并测目标勾选列表 */
@@ -565,8 +649,8 @@ a{color:inherit}
 .channel-filter-tabs{display:inline-flex;align-items:center;gap:6px;background:var(--line-2);padding:3px;border-radius:var(--r-sm);border:1px solid var(--line-2)}
 .filter-tab{border:0;background:transparent;color:var(--muted);font-size:var(--text-xs);padding:4px 10px;border-radius:var(--r-xs);cursor:pointer;transition:all .15s ease}
 .filter-tab:hover{color:var(--ink)}
-.filter-tab.active{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-:root[data-theme="dark"] .filter-tab.active{background:var(--surface-solid);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.filter-tab.active,.filter-tab.on{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+:root[data-theme="dark"] .filter-tab.active,:root[data-theme="dark"] .filter-tab.on{background:rgba(255,255,255,.14) !important;color:#ffffff !important;border:1px solid rgba(255,255,255,.18) !important;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 
 .channel-group-divider{
   grid-column:1 / -1;
@@ -621,6 +705,7 @@ a{color:inherit}
 .analytics-summary{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.analytics-stat{padding:20px 18px}.analytics-stat+.analytics-stat{border-left:1px solid var(--line)}.analytics-stat .v{font-size:28px;font-weight:680}.analytics-stat .l{font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:5px}.bar-list{display:flex;flex-direction:column;gap:11px}.bar-row{display:grid;grid-template-columns:120px 1fr 72px;align-items:center;gap:12px}.bar-label{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar-track{height:4px;background:var(--line-2);position:relative}.bar-fill{position:absolute;inset:0 auto 0 0;background:var(--ink);min-width:1px}.bar-value{text-align:right;font-family:var(--font-mono);font-size:9px;color:var(--muted)}
 
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px}.settings-block{padding:22px 0;border-top:1px solid var(--line)}.settings-block h3{font-size:13px;margin:0 0 18px}.field{margin-bottom:18px}.field label{display:block;font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}.field input{width:100%;height:38px;border:1px solid var(--line);background:transparent;padding:0 11px;outline:none;font-family:var(--font-mono);font-size:10px}.field input:focus{border-color:var(--ink)}.field-row{display:flex;gap:8px}.field-row input{flex:1}.setting-line{display:flex;justify-content:space-between;gap:20px;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:10px}.setting-line span:first-child{color:var(--muted)}.theme-switch{display:flex;gap:8px}.theme-b{border:1px solid var(--line);background:transparent;padding:8px 11px;font-size:9px}.theme-b.active{background:var(--ink);color:var(--inverse)}
+:root[data-theme="dark"] .theme-b.active{background:rgba(255,255,255,.16) !important;color:#ffffff !important;border-color:rgba(255,255,255,.32) !important}
 .truth-note{padding:17px 18px;border-left:3px solid var(--ink);background:var(--line-2);font-size:9.5px;color:var(--ink-2);line-height:1.75}.truth-note b{font-weight:700}.truth-list{margin:9px 0 0;padding-left:18px}.truth-list li{margin:5px 0}
 
 /* states */
@@ -741,7 +826,7 @@ body{position:relative}
 /* KPI = editorial modules floating in the same architecture, not SaaS tiles. */
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:14px;border:0;background:none}
 .kpi{
-  min-height:91px;padding:17px 18px 14px;
+  min-height:91px;padding:17px 68px 14px 18px;
   border:1px solid rgba(17,17,17,.075)!important;border-radius:8px;
   background:rgba(250,249,246,.39);
 }
@@ -758,27 +843,12 @@ body{position:relative}
   background:linear-gradient(180deg,rgba(249,248,245,.36),rgba(247,246,242,.22) 62%,rgba(247,246,242,.08));
   box-shadow:none;
 }
-.topology-head{height:68px;padding:15px 22px 6px 24px;align-items:flex-start}
-.topology-title{font-size:15px;font-weight:680;letter-spacing:-.01em;text-transform:none;color:var(--ink)}
-.topology-sub{margin-top:6px;font-size:var(--text-sm);letter-spacing:.09em;color:rgba(17,17,17,.44)}
-.topology-head-right{display:flex;align-items:center;gap:13px;padding-top:1px}
-.alias-picker{border:0;border-bottom:1px solid rgba(17,17,17,.11);background:transparent;padding:4px 22px 5px 4px;min-width:142px;font-size:13px;border-radius:0}
-.topology-stage{height:376px}
-.topology-svg path.route-line{stroke-width:.9;opacity:.46}
-.topology-svg path.route-line.current{stroke-width:1.45;opacity:.9}
-.topology-svg path.request-line{stroke-width:1;opacity:.7}
-.request-node{left:13.5%;top:49%}
-.request-dot{width:12px;height:12px}
-.request-copy strong{font-size:13px}
-.alias-core{left:44%;top:49%;width:154px;height:154px;background:radial-gradient(circle at 39% 29%,#4d4d4d 0,#161616 30%,#070707 70%,#000 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 15px 28px rgba(0,0,0,.11)}
-.alias-core .alias-name{font-size:20px;font-weight:720}
-.alias-core .alias-meta{font-size:11.5px;letter-spacing:.07em;color:#b9b9b5}
-.member-node{left:78.5%;width:220px;gap:10px}
-.member-dot{width:36px;height:36px;flex:0 0 36px;font-size:11px}
-.member-name{font-size:var(--text-base);font-weight:620}
-.member-model{font-size:var(--text-sm);margin-top:3px;color:#898985}
-.member-state{font-size:var(--text-xs);letter-spacing:.12em;margin-top:3px}
-.topology-caption{height:34px;padding:0 24px;font-size:var(--text-xs);color:rgba(17,17,17,.42);position:relative;z-index:3}
+.topology-head{padding:16px 20px;align-items:center}
+.topology-title{font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.topology-sub{margin-top:3px;font-size:var(--text-sm);letter-spacing:.03em;color:var(--muted)}
+.topology-head-right{display:flex;align-items:center;gap:12px}
+.topology-stage{min-height:430px;padding:16px}
+.topology-caption{height:36px;padding:0 20px;font-size:var(--text-xs);color:var(--muted);position:relative;z-index:3}
 
 /* Right rail = architectural instrumentation, thin lines and calm hierarchy. */
 .instrument,.admission{
@@ -816,15 +886,15 @@ body{position:relative}
   .dashboard-grid{grid-template-columns:minmax(0,1fr) minmax(420px,500px);gap:20px}
   .kpi{min-height:110px;padding:21px 23px}.kpi-num{font-size:30px}.kpi-label{font-size:11px}
   .topology-panel{min-height:610px}.topology-stage{height:470px}.topology-head{height:82px;padding:19px 28px 8px}.topology-title{font-size:18px}
-  .alias-core{width:188px;height:188px}.alias-core .alias-name{font-size:25px}
+  .topo-pipeline-container{grid-template-columns:210px 310px minmax(0,1fr);gap:36px}.topo-upstream-wrap{max-width:620px}
   .instrument{min-height:198px}.admission{min-height:365px}
   .adm-row{min-height:58px}
 }
 @media(max-width:1500px){
-  :root{--sidebar-w:310px}.sidebar{padding-left:26px}.topbar{padding-left:58px;padding-right:106px}.main{padding-left:58px;padding-right:86px}.dashboard-grid{grid-template-columns:minmax(0,1fr) 320px}
+  :root{--sidebar-w:270px}.sidebar{padding-left:22px;padding-right:20px}.topbar{padding-left:36px;padding-right:60px}.main{padding-left:36px;padding-right:48px}.dashboard-grid{grid-template-columns:minmax(0,1fr) 280px;gap:16px}
 }
-@media(max-width:1180px){
-  :root{--sidebar-w:84px}.sidebar{background:linear-gradient(90deg,rgba(0,0,0,.54),rgba(0,0,0,.08),transparent)}.topbar{padding-left:38px}.main{padding-left:38px}.dashboard-grid{grid-template-columns:1fr}.dashboard-rail{display:grid;grid-template-columns:1fr 1fr}
+@media(max-width:1240px){
+  :root{--sidebar-w:84px}.sidebar{background:linear-gradient(90deg,rgba(0,0,0,.54),rgba(0,0,0,.08),transparent)}.topbar{padding-left:32px}.main{padding-left:32px}.dashboard-grid{grid-template-columns:1fr}.dashboard-rail{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 }
 @media(max-width:780px){
   .material-stage{display:block}.material-stage::before{background-position:19% center;opacity:.18}.paper-grain{display:block;opacity:.04}.sidebar{background:#111}.topbar::before{display:none}.main{padding-left:20px;padding-right:20px}.kpis{gap:7px}.kpi{border-radius:5px}.topology-panel,.instrument,.admission{border-radius:5px;background:rgba(243,242,238,.82)}
@@ -846,8 +916,14 @@ body{position:relative}
   --line-2:rgba(255,255,255,.07);
   --surface:rgba(15,15,14,.55);
   --surface-solid:#141413;
+  --inverse:#0e0e0d;
   --shadow-soft:0 24px 60px rgba(0,0,0,.5);
 }
+:root[data-theme="dark"] ::selection{background:rgba(255,255,255,.28) !important;color:#ffffff !important}
+:root[data-theme="dark"] .avatar-btn{background:rgba(255,255,255,.14) !important;color:#ffffff !important;border:1px solid rgba(255,255,255,.22) !important}
+:root[data-theme="dark"] .toast{background:#1a1a19 !important;color:#f1f0eb !important;border:1px solid rgba(255,255,255,.18) !important;box-shadow:0 18px 45px rgba(0,0,0,.65) !important}
+:root[data-theme="dark"] .auth-banner{background:#1c1c1a !important;color:#f1f0eb !important;border-bottom:1px solid rgba(255,255,255,.18) !important}
+:root[data-theme="dark"] .tag.solid{background:rgba(255,255,255,.15) !important;color:#ffffff !important;border-color:rgba(255,255,255,.26) !important}
 /* 黑夜模式背景（用户 2026-09-18：保留之前的背景图片，不被压黑） */
 :root[data-theme="dark"] .material-stage{background:#0e0e0d}
 :root[data-theme="dark"] .material-stage::before{filter:grayscale(1) brightness(.72) contrast(1.06) saturate(.88);opacity:1}
@@ -864,20 +940,21 @@ body{position:relative}
 :root[data-theme="dark"] .greeting p{color:rgba(236,235,230,.62);text-shadow:0 1px 14px rgba(0,0,0,.4)}
 :root[data-theme="dark"] .searchbox{background:rgba(10,10,9,.5);border-color:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.045)}
 
-:root[data-theme="dark"] .kpi{border:1px solid rgba(255,255,255,.11)!important;background:rgba(10,10,9,.5)}
+:root[data-theme="dark"] .kpi{border:1px solid rgba(255,255,255,.11)!important;background:rgba(10,10,9,.5);padding-right:68px !important}
 :root[data-theme="dark"] .kpi+.kpi{border-left:1px solid rgba(255,255,255,.11)}
-:root[data-theme="dark"] .kpi-label{color:#a5a49e}
-:root[data-theme="dark"] .kpi-foot{color:rgba(255,255,255,.36)}
+:root[data-theme="dark"] .kpi-label{color:#c5c4bd !important}
+:root[data-theme="dark"] .kpi-foot{color:rgba(255,255,255,.55) !important}
+:root[data-theme="dark"] .kpi-bars i{background:rgba(255,255,255,.38) !important}
 
 :root[data-theme="dark"] .topology-panel{border:1px solid rgba(255,255,255,.12);background:linear-gradient(180deg,rgba(8,8,7,.22),rgba(8,8,7,.06) 55%,rgba(8,8,7,.3))}
-:root[data-theme="dark"] .topology-sub{color:rgba(240,239,234,.55)}
+:root[data-theme="dark"] .topology-sub{color:rgba(240,239,234,.7) !important}
 :root[data-theme="dark"] .alias-picker{border-bottom-color:rgba(255,255,255,.16)}
-:root[data-theme="dark"] .topology-caption{color:rgba(240,239,234,.5)}
+:root[data-theme="dark"] .topology-caption{color:rgba(240,239,234,.7) !important}
 
-:root[data-theme="dark"] .alias-core{background:radial-gradient(circle at 39% 29%,#5c5c5c 0,#191919 32%,#060606 72%,#000 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15),0 24px 55px rgba(0,0,0,.6)}
-:root[data-theme="dark"] .member-dot{background:#0a0a0a;color:#f2f1ec;border:1px solid rgba(255,255,255,.3)}
-:root[data-theme="dark"] .member-node.cooldown .member-dot{background:transparent;border-color:rgba(255,255,255,.4)}
-:root[data-theme="dark"] .member-model{color:#95948e}
+:root[data-theme="dark"] .topo-card{background:rgba(18,18,20,.65);border-color:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 12px 30px rgba(0,0,0,.35)}
+:root[data-theme="dark"] .topo-card-router{background:radial-gradient(circle at 50% 0%,rgba(255,255,255,.06) 0%,transparent 75%),rgba(22,22,26,.85);border-color:rgba(255,255,255,.14)}
+:root[data-theme="dark"] .topo-matrix-grid{background:rgba(0,0,0,.3);border-color:rgba(255,255,255,.06)}
+:root[data-theme="dark"] .topo-upstream-card{background:rgba(18,18,20,.65);border-color:rgba(255,255,255,.08)}
 
 :root[data-theme="dark"] .instrument,:root[data-theme="dark"] .admission{border:1px solid rgba(255,255,255,.11);background:rgba(10,10,9,.5)}
 :root[data-theme="dark"] .mini-chart{border-color:rgba(255,255,255,.09);background:rgba(255,255,255,.035)}
@@ -943,15 +1020,16 @@ body{position:relative}
 /* 表格容器不加圆角，避免与内部单元格打架 */
 .data-sheet{border-radius:0}
 
-/* ---- ④ 暗色下的柔和对比：纯白填充改为柔白，避免对撞 ---- */
+/* ---- ④ 暗色下的柔和对比：杜绝白底黑字硬块，采用高通透半透明微光底+纯白正文 ---- */
 :root[data-theme="dark"] .tag.solid,
-:root[data-theme="dark"] .solid-btn,
 :root[data-theme="dark"] .picked-chip{
-  background:var(--ink) !important;color:var(--inverse) !important;border-color:var(--ink) !important}
-/* 主按钮在暗色下不再纯白底黑字，改为「柔白底 + 深字」，降低刺眼度 */
-:root[data-theme="dark"] .solid-btn{background:color-mix(in srgb,var(--ink) 88%,transparent) !important;
-  color:#121212 !important}
-:root[data-theme="dark"] .solid-btn:hover{background:var(--ink) !important}
+  background:rgba(255,255,255,.14) !important;color:#ffffff !important;border-color:rgba(255,255,255,.28) !important}
+/* 主按钮在暗色下采用优雅半透微光，文字纯白，杜绝被插件反转为白底白字 */
+:root[data-theme="dark"] .solid-btn{
+  background:rgba(255,255,255,.16) !important;color:#ffffff !important;border:1px solid rgba(255,255,255,.32) !important;
+  box-shadow:0 2px 10px rgba(0,0,0,.35) !important}
+:root[data-theme="dark"] .solid-btn:hover{
+  background:rgba(255,255,255,.26) !important;border-color:rgba(255,255,255,.55) !important;color:#ffffff !important}
 /* 卡片描边在暗色下更淡，靠底色分层而非白线分割 */
 :root[data-theme="dark"] .channel-card{border-color:var(--line-2)}
 :root[data-theme="dark"] .channel-card:hover{border-color:var(--line)}
@@ -1111,6 +1189,70 @@ body{position:relative}
 .detail-display{font-size:var(--text-base)}
 .fact-label{font-size:var(--text-sm)}
 .fact-value{font-size:13px}
+
+/* 9. 语义缓存监控卡片 */
+.cache-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.cache-kpi-item{border:1px solid rgba(17,17,17,.065);background:rgba(255,255,255,.12);padding:10px 12px;border-radius:var(--r-xs)}
+:root[data-theme="dark"] .cache-kpi-item{border-color:rgba(255,255,255,.09);background:rgba(255,255,255,.035)}
+.cache-kpi-val{font-size:18px;font-weight:680;font-family:var(--font-mono);color:var(--ink)}
+.cache-kpi-lbl{font-size:var(--text-xs);color:var(--muted);margin-top:2px}
+.cache-perf-box{margin-top:12px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.cache-perf-row{display:flex;justify-content:space-between;align-items:center;font-size:var(--text-xs)}
+.cache-perf-k{color:var(--muted)}
+.cache-perf-v{font-family:var(--font-mono);color:var(--ink)}
+.cache-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:5px;box-shadow:0 0 8px rgba(16,185,129,.4)}
+
+/* 10. 质量评分胶囊与榜单 */
+.badge-quality{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--r-xs);font-size:11px;font-family:var(--font-mono);font-weight:600;letter-spacing:.02em;border:1px solid transparent}
+.badge-quality.q-excellent{background:rgba(16,185,129,.12);color:#059669;border-color:rgba(16,185,129,.28)}
+.badge-quality.q-good{background:rgba(59,130,246,.12);color:#2563eb;border-color:rgba(59,130,246,.28)}
+.badge-quality.q-fair{background:rgba(245,158,11,.12);color:#d97706;border-color:rgba(245,158,11,.28)}
+.badge-quality.q-degraded{background:rgba(239,68,68,.12);color:#dc2626;border-color:rgba(239,68,68,.28)}
+.badge-quality.q-offline{background:rgba(107,114,128,.12);color:#6b7280;border-color:rgba(107,114,128,.28)}
+:root[data-theme="dark"] .badge-quality.q-excellent{background:rgba(16,185,129,.18);color:#34d399;border-color:rgba(52,211,153,.35)}
+:root[data-theme="dark"] .badge-quality.q-good{background:rgba(59,130,246,.18);color:#60a5fa;border-color:rgba(96,165,250,.35)}
+:root[data-theme="dark"] .badge-quality.q-fair{background:rgba(245,158,11,.18);color:#fbbf24;border-color:rgba(251,191,36,.35)}
+:root[data-theme="dark"] .badge-quality.q-degraded{background:rgba(239,68,68,.18);color:#f87171;border-color:rgba(248,113,113,.35)}
+:root[data-theme="dark"] .badge-quality.q-offline{background:rgba(156,163,175,.15);color:#9ca3af;border-color:rgba(156,163,175,.3)}
+
+/* 11. 多租户治理大屏 */
+.tenant-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:18px;margin-top:20px}
+.tenant-card{background:rgba(250,249,246,.5);border:1px solid rgba(17,17,17,.08);border-radius:var(--r-md);padding:18px;position:relative;display:flex;flex-direction:column;gap:14px;transition:box-shadow .2s var(--ease),border-color .2s var(--ease)}
+:root[data-theme="dark"] .tenant-card{background:rgba(15,15,14,.65);border-color:rgba(255,255,255,.1)}
+.tenant-card:hover{border-color:var(--ink);box-shadow:0 4px 18px rgba(0,0,0,.04)}
+.tenant-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.tenant-name{font-size:16px;font-weight:650;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.tenant-id{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px}
+.tenant-key-row{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.03);padding:6px 10px;border-radius:var(--r-xs);border:1px dashed var(--line)}
+:root[data-theme="dark"] .tenant-key-row{background:rgba(255,255,255,.03)}
+.tenant-key-text{font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;flex:1;color:var(--ink)}
+.tenant-copy-btn{appearance:none;border:none;background:transparent;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 6px;border-radius:3px}
+.tenant-copy-btn:hover{color:var(--ink);background:rgba(0,0,0,.06)}
+:root[data-theme="dark"] .tenant-copy-btn:hover{background:rgba(255,255,255,.1)}
+.tenant-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:var(--text-xs);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0}
+.tenant-meta-item{display:flex;flex-direction:column;gap:2px}
+.tenant-meta-lbl{color:var(--muted)}
+.tenant-meta-val{font-family:var(--font-mono);font-weight:600;color:var(--ink)}
+.tenant-models{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tenant-foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:4px}
+.tenant-today{font-size:var(--text-xs);color:var(--muted)}
+.tenant-actions{display:flex;gap:8px}
+
+/* 模态弹窗 Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s var(--ease)}
+.modal-overlay.open{opacity:1;pointer-events:auto}
+.modal-dialog{background:var(--paper,#faf9f5);border:1px solid rgba(17,17,17,.12);box-shadow:0 20px 48px rgba(0,0,0,.16);border-radius:var(--r-lg);width:100%;max-width:480px;padding:26px 28px;transform:translateY(12px);transition:transform .2s var(--ease);color:var(--ink)}
+:root[data-theme="dark"] .modal-dialog{background:#141413;border-color:rgba(255,255,255,.14);box-shadow:0 24px 56px rgba(0,0,0,.5)}
+.modal-overlay.open .modal-dialog{transform:translateY(0)}
+.modal-title{font-size:18px;font-weight:650;letter-spacing:-.015em;margin-bottom:6px}
+.modal-sub{font-size:var(--text-xs);color:var(--muted);line-height:1.6;margin-bottom:20px}
+.modal-form{display:flex;flex-direction:column;gap:14px}
+.modal-field{display:flex;flex-direction:column;gap:5px}
+.modal-field label{font-size:var(--text-xs);font-weight:600;color:var(--ink)}
+.modal-field input,.modal-field select{height:38px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-xs);background:transparent;color:var(--ink);font-size:13px;outline:none}
+.modal-field input:focus,.modal-field select:focus{border-color:var(--ink)}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
+.key-reveal-box{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:var(--r-xs);padding:14px;margin:16px 0;word-break:break-all;font-family:var(--font-mono);font-size:13px;color:var(--ink);user-select:all}
 </style>
 </head>
 <body>
@@ -1165,6 +1307,21 @@ body{position:relative}
               </div>
               <div class="section-note" style="margin-top:10px" data-i18n="noLatencyNote">当前观测 API 未提供请求延迟字段，因此不估算延迟。</div>
             </div>
+            <div class="instrument" id="cacheInstrument">
+              <div class="instrument-head"><div class="instrument-title" data-i18n="cacheTitle">两级语义缓存 / Semantic Cache</div><div class="live-pill" id="cacheStatusPill"><i class="cache-dot"></i><span id="cacheStatusText">Active</span></div></div>
+              <div class="cache-kpi-grid">
+                <div class="cache-kpi-item"><div class="cache-kpi-val" id="cacheActiveEntries">—</div><div class="cache-kpi-lbl" data-i18n="cacheActive">活跃词条 / Entries</div></div>
+                <div class="cache-kpi-item"><div class="cache-kpi-val" id="cacheHits">—</div><div class="cache-kpi-lbl" data-i18n="cacheHits">极速命中 / Hits</div></div>
+              </div>
+              <div class="cache-perf-box">
+                <div class="cache-perf-row"><span class="cache-perf-k">⚡ 命中时延 / Latency</span><span class="cache-perf-v"><b>~7.3ms</b> <span class="muted tiny">(降幅 &gt;99.7%)</span></span></div>
+                <div class="cache-perf-row"><span class="cache-perf-k">💰 Token 节省 / Saved</span><span class="cache-perf-v"><b>100%</b> <span class="muted tiny">(0 上游消耗)</span></span></div>
+                <div class="cache-perf-row"><span class="cache-perf-k">📦 存储引擎 / Engine</span><span class="cache-perf-v"><span class="mono tiny">SQLite3 WAL + Cosine</span></span></div>
+              </div>
+              <div style="margin-top:12px;display:flex;justify-content:flex-end">
+                <button class="ghost-btn" id="purgeCacheBtn" style="height:28px;font-size:11px;padding:0 10px;" data-i18n="purgeCache">清空缓存 / Purge</button>
+              </div>
+            </div>
             <div class="admission">
               <div class="admission-title" data-i18n="admissionTitle">成员准入序列</div>
               <div class="admission-flow" id="admissionFlow"></div>
@@ -1218,20 +1375,89 @@ body{position:relative}
       </section>
 
       <section class="view" id="view-probes" data-view="probes">
-        <div class="view-head"><div><div class="view-kicker">06 / Probe facts</div><div class="view-title" data-i18n="probesTitle">探针事实</div><div class="view-sub" data-i18n="probesSub">只读模型实测事实注册表：access/capabilities/billing/performance，来自 probe_runs → reducer → /api/model-state。没有推荐排序，路由策略由编排层决定。</div></div></div>
+        <div class="view-head">
+          <div><div class="view-kicker" data-i18n="probesKicker">08 / MODEL BENCHMARKS & LEADERBOARD</div><div class="view-title" data-i18n="probesTitle">模型实测大盘</div><div class="view-sub" data-i18n="probesSub">全网 577+ 款上游大模型实测链路观测台：综合质量评分、吞吐速度 (tok/s)、首字响应延迟 (TTFT) 与计费模式台账。</div></div>
+          <div class="view-tools"><button class="solid-btn" id="runProbesBtn" data-i18n="probesRun">⚡ 重新跑分评测</button></div>
+        </div>
         <div class="section" style="padding:0;border:0">
           <div id="probesMeta" style="color:var(--muted);font-size:10px;letter-spacing:.08em;margin:0 0 14px"></div>
           <div id="probesSummary" style="display:flex;gap:28px;flex-wrap:wrap;margin:0 0 18px"></div>
-          <div class="probes-toolbar">
-            <input type="search" id="probesQ" data-i18n-ph="probesSearchPh" placeholder="搜索模型名（如 claude、qwen、glm-5.3）…">
-            <div id="probesFilters">
-              <button class="filter-tab on" data-f="all">全部</button>
-              <button class="filter-tab" data-f="available">✅ 可用</button>
-              <button class="filter-tab" data-f="paid_required">💰 需付费</button>
-              <button class="filter-tab" data-f="unknown">❓ 未知</button>
-              <button class="filter-tab" data-f="fast">⚡ 速度榜</button>
+
+          <!-- 复合筛选与动态排序控制台 -->
+          <div class="probes-console" id="probesConsole">
+            <div class="probes-console-primary">
+              <div class="probes-search-wrap">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                <input type="search" id="probesQ" data-i18n-ph="probesSearchPh" placeholder="搜索模型名、系列或所属渠道（如 qwen2.5, claude, groq, mini）…">
+              </div>
+              <div class="probes-view-toggle">
+                <button class="probes-v-btn active" data-vmode="leaderboard" id="vbtnLeaderboard" title="全网跨渠道大天梯精排">📊 全网天梯大榜</button>
+                <button class="probes-v-btn" data-vmode="grouped" id="vbtnGrouped" title="按渠道分别归类卡片呈现">📁 按渠道归类</button>
+              </div>
+              <button class="probes-reset-btn" id="probesResetBtn" title="恢复全部默认筛选">↺ 重置筛选</button>
+              <div class="probes-count-badge" id="probesCountBadge">已匹配 <b>0</b> / 0 款模型</div>
+            </div>
+
+            <div class="probes-console-secondary">
+              <div class="probes-presets" id="probesPresets">
+                <span style="font-size:11px;color:var(--muted);margin-right:2px">快捷预设:</span>
+                <button class="probes-preset-btn active" data-preset="all">全部</button>
+                <button class="probes-preset-btn" data-preset="quality_70">🏆 优质推荐 (≥70)</button>
+                <button class="probes-preset-btn" data-preset="fast">⚡ 极速榜 (tok/s)</button>
+                <button class="probes-preset-btn" data-preset="free_avail">🟢 纯免费可用</button>
+                <button class="probes-preset-btn" data-preset="low_ttft">⏱ 低延迟先锋</button>
+              </div>
+
+              <div class="probes-facets">
+                <div class="probes-select-group">
+                  <span>渠道:</span>
+                  <select class="probes-select" id="probesChannelFilter">
+                    <option value="all">全部渠道 (All)</option>
+                  </select>
+                </div>
+                <div class="probes-select-group">
+                  <span>状态:</span>
+                  <select class="probes-select" id="probesAccessFilter">
+                    <option value="all">全部状态</option>
+                    <option value="available">✅ 实测可用</option>
+                    <option value="paid_required">💰 需付费</option>
+                    <option value="unknown">❓ 未知/待测</option>
+                  </select>
+                </div>
+                <div class="probes-select-group">
+                  <span>计费:</span>
+                  <select class="probes-select" id="probesBillingFilter">
+                    <option value="all">全部费用</option>
+                    <option value="free">🟢 纯免费</option>
+                    <option value="paid">🟡 商业计费</option>
+                  </select>
+                </div>
+                <div class="probes-select-group">
+                  <span>质量:</span>
+                  <select class="probes-select" id="probesTierFilter">
+                    <option value="all">全部评分</option>
+                    <option value="70">🏆 ≥70 优质榜</option>
+                    <option value="90">🟢 ≥90 卓越</option>
+                    <option value="good">🔵 70~89 良好</option>
+                    <option value="fair">🟡 50~69 一般</option>
+                    <option value="degraded">⚪ &lt;50 降级</option>
+                  </select>
+                </div>
+                <div class="probes-select-group">
+                  <span>排序:</span>
+                  <select class="probes-select" id="probesSortSelect" style="font-weight:600">
+                    <option value="qs_desc">🏆 综合质量分：高 → 低</option>
+                    <option value="speed_desc">⚡ 吞吐速率：快 → 慢</option>
+                    <option value="ttft_asc">⏱ 首字延迟：低 → 高 (最快响应)</option>
+                    <option value="samples_desc">🎯 实测采样：多 → 少 (高置信)</option>
+                    <option value="name_asc">🔤 模型名称：A → Z</option>
+                    <option value="name_desc">🔤 模型名称：Z → A</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
+
           <div id="probesContent"></div>
         </div>
       </section>
@@ -1278,6 +1504,7 @@ const NAV=[
   ['modeltest','Model Test','test'],['logs','Logs & Traces','logs'],['analytics','Analytics','chart'],['probes','Probes','probe'],['settings','Settings','settings']
 ];
 const ICONS={
+  key:'<svg viewBox="0 0 24 24"><path d="m15.5 8.5 2 2M13.5 10.5 17 7l2 2 2-2-3.5-3.5a5 5 0 1 0-7 7l-7 7v4h4l2-2v-2l2-2v-2l1.5-1.5z"></path><circle cx="6.5" cy="6.5" r="1.5"></circle></svg>',
   test:'<svg viewBox="0 0 24 24"><path d="M7 4h10v5l-5 3.5L7 9z"></path><path d="M12 12.5V20M8.5 20h7"></path></svg>',
   home:'<svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20H4z"></path><path d="M9 20v-6h6v6"></path></svg>',
   cube:'<svg viewBox="0 0 24 24"><path d="m4.5 7 7.5-4 7.5 4v10L12 21l-7.5-4z"></path><path d="m4.5 7 7.5 4 7.5-4M12 11v10"></path></svg>',
@@ -1292,7 +1519,7 @@ let LANG=(function(){try{return localStorage.getItem('gw-lang')||((navigator.lan
 const I18N={
 zh:{
  docTitle:'API 转发网关',
- nav_dashboard:'总览',nav_catalog:'模型目录',nav_routes:'路由管理',nav_channels:'渠道注册表',nav_logs:'日志与追踪',nav_analytics:'用量分析',nav_probes:'探针事实',nav_settings:'设置',nav_modeltest:'渠道模型测试',probesTitle:'探针事实',probesSub:'只读模型实测事实注册表：access / capabilities / billing / performance，来自 probe_runs → reducer → /api/model-state。没有推荐排序，路由策略由编排层决定。',probesSearchPh:'搜索模型名（如 claude、qwen、glm-5.3）…',mtTitle:'渠道模型测试',mtSub:'选择模型，真实发起一次对话补全，验证该模型当前能否跑通。',mtModel:'模型',mtPrompt:'提示词',mtRun:'运行测试',mtRunning:'测试运行中…',mtResultT:'测试结果',mtStatus:'状态',mtOk:'成功',mtFail:'失败',mtLatency:'耗时',mtUsage:'用量',mtIdle:'尚未运行测试',mtIdleHint:'在左侧确认渠道与模型、填好提示词，点「运行测试」，结果会显示在这里。',mtPlanIdle:'选择模型后自动加载候选链。',mtSetupT:'测试参数',mtPlanT:'当前路由计划（排障）',mtNote:'每次测试真实调用一次对话补全（max_tokens 1024），计入渠道用量。',mtSearchPh:'搜索模型（仅启用渠道的模型）…',mtScopeNote:'个启用渠道的模型并集',mtScopeFallback:'全量目录（未取得启用渠道列表）',mtChannelT:'渠道筛选',mtAllCh:'全部启用渠道',mtFrom:'来源渠道：',mtPaidWarn:'⚠ 为什么出现这条：该模型有渠道会按量扣费（如 opencode / tokenrhythm 等）。你点「运行测试」只发一次请求，网关会从候选链里选一个可用渠道执行——如果落到付费渠道就会扣费（max_tokens 1024 单次约几分钱以内）。想避免扣费：切到「多渠道并测」只勾免费渠道，或在「单渠道单测」里锁定一个免费渠道。',mtFreeNote:'该模型在所有可用渠道均为免费/赠送额度，本次测试不会扣费。',mtUnknownWarn:'⚠ 为什么出现这条：这些渠道是免费渠道（如 NVIDIA NIM、openrouter），但没提供「该模型免费」的模型级白名单，本页无法向你保证不扣费。确认办法：切到「多渠道并测」看勾选列表，或在「单渠道单测」锁定 NVIDIA NIM（其免费档全模型免费）。',mtNoMatch:'无匹配模型',mtMode:'测试模式',mtModeSingle:'单渠道单测',mtModeMulti:'多渠道并测',mtModeSingleHint:'锁定一个渠道，只测这一个（绕过回落链）。选「全部启用渠道」时由网关自行回落。',mtModeMultiHint:'同一模型在多个渠道并发测试，便于横向对比速度与可用性。默认只勾免费渠道，付费渠道需手动勾选。',mtTargetsT:'并测渠道',mtFreeCount:'个免费',mtNoTarget:'该模型暂无可测渠道',mtRunHintMulti:'并发调用所选渠道 · max_tokens 1024',mtRunningMulti:'正在并发测试 {n} 个渠道…',mtMultiSum:'汇总',mtOkN:'成功',mtTotal:'总耗时',
+  nav_dashboard:'总览',nav_catalog:'模型目录',nav_routes:'路由管理',nav_channels:'渠道注册表',cacheTitle:'两级语义缓存',cacheActive:'活跃词条',cacheHits:'极速命中',purgeCache:'清空缓存',probesRun:'⚡ 重新跑分评测',probesRank70:'🏆 优质榜 (70+)',nav_logs:'日志与追踪',nav_analytics:'用量分析',nav_probes:'模型实测大盘',nav_settings:'设置',nav_modeltest:'渠道模型测试',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'模型实测大盘',probesSub:'全网 577+ 款上游大模型实测链路观测台：综合质量评分、吞吐速度 (tok/s)、首字响应延迟 (TTFT) 与计费模式台账。',probesSearchPh:'搜索模型名、系列或所属渠道（如 qwen2.5, claude, groq）…',mtTitle:'渠道模型测试',mtSub:'选择模型，真实发起一次对话补全，验证该模型当前能否跑通。',mtModel:'模型',mtPrompt:'提示词',mtRun:'运行测试',mtRunning:'测试运行中…',mtResultT:'测试结果',mtStatus:'状态',mtOk:'成功',mtFail:'失败',mtLatency:'耗时',mtUsage:'用量',mtIdle:'尚未运行测试',mtIdleHint:'在左侧确认渠道与模型、填好提示词，点「运行测试」，结果会显示在这里。',mtPlanIdle:'选择模型后自动加载候选链。',mtSetupT:'测试参数',mtPlanT:'当前路由计划（排障）',mtNote:'每次测试真实调用一次对话补全（max_tokens 1024），计入渠道用量。',mtSearchPh:'搜索模型（仅启用渠道的模型）…',mtScopeNote:'个启用渠道的模型并集',mtScopeFallback:'全量目录（未取得启用渠道列表）',mtChannelT:'渠道筛选',mtAllCh:'全部启用渠道',mtFrom:'来源渠道：',mtPaidWarn:'⚠ 为什么出现这条：该模型有渠道会按量扣费（如 opencode / tokenrhythm 等）。你点「运行测试」只发一次请求，网关会从候选链里选一个可用渠道执行——如果落到付费渠道就会扣费（max_tokens 1024 单次约几分钱以内）。想避免扣费：切到「多渠道并测」只勾免费渠道，或在「单渠道单测」里锁定一个免费渠道。',mtFreeNote:'该模型在所有可用渠道均为免费/赠送额度，本次测试不会扣费。',mtUnknownWarn:'⚠ 为什么出现这条：这些渠道是免费渠道（如 NVIDIA NIM、openrouter），但没提供「该模型免费」的模型级白名单，本页无法向你保证不扣费。确认办法：切到「多渠道并测」看勾选列表，或在「单渠道单测」锁定 NVIDIA NIM（其免费档全模型免费）。',mtNoMatch:'无匹配模型',mtMode:'测试模式',mtModeSingle:'单渠道单测',mtModeMulti:'多渠道并测',mtModeSingleHint:'锁定一个渠道，只测这一个（绕过回落链）。选「全部启用渠道」时由网关自行回落。',mtModeMultiHint:'同一模型在多个渠道并发测试，便于横向对比速度与可用性。默认只勾免费渠道，付费渠道需手动勾选。',mtTargetsT:'并测渠道',mtFreeCount:'个免费',mtNoTarget:'该模型暂无可测渠道',mtRunHintMulti:'并发调用所选渠道 · max_tokens 1024',mtRunningMulti:'正在并发测试 {n} 个渠道…',mtMultiSum:'汇总',mtOkN:'成功',mtTotal:'总耗时',
  brandSub:'统一连接 · 智行无界',connInitial:'观测 API',connLive:'观测在线',connAuth:'需要鉴权',connOffline:'观测离线',
  authBanner:'观测 API 需要鉴权',setCred:'设置凭据',greetHint:'点击切换显示实时时间',searchPh:'搜索模型、渠道、路由…',retry:'重试',
  offlineProtected:'观测 API 受保护。请在设置中添加观测凭据。',offlineUnavail:'观测 API 不可达：',
@@ -1349,7 +1576,64 @@ zh:{
 },
 en:{
  docTitle:'API Gateway',
- nav_dashboard:'Dashboard',nav_catalog:'Model Catalog',nav_routes:'Route Management',nav_channels:'Channel Registry',nav_logs:'Logs & Traces',nav_analytics:'Analytics',nav_probes:'Probes',nav_settings:'Settings',nav_modeltest:'Model Test',probesTitle:'Probes',probesSub:'Read-only measured model facts: access / capabilities / billing / performance, from probe_runs → reducer → /api/model-state. No ranking; routing policy belongs to the orchestrator.',probesSearchPh:'Search models (e.g. claude, qwen, glm-5.3)…',mtTitle:'Model Test',mtSub:'Pick a model and fire one real chat completion to verify it can run right now.',mtModel:'Model',mtPrompt:'Prompt',mtRun:'Run test',mtRunning:'Running…',mtResultT:'Test result',mtStatus:'Status',mtOk:'OK',mtFail:'FAIL',mtLatency:'Latency',mtUsage:'Usage',mtIdle:'No test run yet',mtIdleHint:'Confirm channel and model on the left, write a prompt, then hit Run. Results appear here.',mtPlanIdle:'Pick a model to load its candidate chain.',mtSetupT:'Test setup',mtPlanT:'Route plan (debug)',mtNote:'Each test fires one real chat completion (max_tokens 1024) and counts toward channel usage.',mtSearchPh:'Search models (enabled channels only)…',mtScopeNote:'models from enabled channels',mtScopeFallback:'full catalog (enabled channel list unavailable)',mtChannelT:'Channel',mtAllCh:'All enabled channels',mtFrom:'Source channels: ',mtPaidWarn:'Why this shows: some channels for this model bill per token (e.g. opencode / tokenrhythm). Run fires ONE request and the gateway picks the first available candidate — if it lands on a paid channel you will be billed (~a small fraction of a cent at max_tokens 1024). To avoid billing: switch to Multi-channel and tick only free ones, or pin a free channel in Single mode.',mtFreeNote:'All source channels are free / free-quota. This test will not be billed.',mtUnknownWarn:'This model sits on a channel with no model-level free whitelist, so billing cannot be confirmed. Verify on the provider page before running.',mtNoMatch:'No matching model',mtMode:'Mode',mtModeSingle:'Single channel',mtModeMulti:'Multi-channel',mtModeSingleHint:'Pin one channel and test only it (bypasses the fallback chain). Pick “All channels” to let the gateway fall back.',mtModeMultiHint:'Fire the same model across several channels concurrently to compare speed and availability. Free channels are pre-selected; paid ones must be ticked manually.',mtTargetsT:'Channels to test',mtFreeCount:'free',mtNoTarget:'No testable channel for this model',mtRunHintMulti:'concurrent calls · max_tokens 1024',mtRunningMulti:'Testing {n} channels concurrently…',mtMultiSum:'Summary',mtOkN:'succeeded',mtTotal:'Total',
+  nav_dashboard:'Dashboard',nav_catalog:'Model Catalog',nav_routes:'Route Management',nav_channels:'Channel Registry',cacheTitle:'Semantic Cache',cacheActive:'Active Entries',cacheHits:'Total Hits',purgeCache:'Purge Cache',probesRun:'⚡ Re-run Benchmarks',probesRank70:'🏆 Tier A (70+)',nav_logs:'Logs & Traces',nav_analytics:'Analytics',nav_probes:'Model Benchmarks',nav_settings:'Settings',nav_modeltest:'Model Test',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'Model Benchmarks',probesSub:'Measured model benchmark facts: quality scores (0-100), throughput (tok/s), TTFT latency, and billing telemetry across 577+ models.',probesSearchPh:'Search model, series, or channel (e.g. qwen2.5, claude, groq)…',mtTitle:'Model Test',mtSub:'Pick a model and fire one real chat completion to verify it can run right now.',mtModel:'Model',mtPrompt:'Prompt',mtRun:'Run test',mtRunning:'Running…',mtResultT:'Test result',mtStatus:'Status',mtOk:'OK',mtFail:'FAIL',mtLatency:'Latency',mtUsage:'Usage',mtIdle:'No test run yet',mtIdleHint:'Confirm channel and model on the left, write a prompt, then hit Run. Results appear here.',mtPlanIdle:'Pick a model to load its candidate chain.',mtSetupT:'Test setup',mtPlanT:'Route plan (debug)',mtNote:'Each test fires one real chat completion (max_tokens 1024) and counts toward channel usage.',mtSearchPh:'Search models (enabled channels only)…',mtScopeNote:'models from enabled channels',mtScopeFallback:'full catalog (enabled channel list unavailable)',mtChannelT:'Channel',mtAllCh:'All enabled channels',mtFrom:'Source channels: ',mtPaidWarn:'Why this shows: some channels for this model bill per token (e.g. opencode / tokenrhythm). Run fires ONE request and the gateway picks the first available candidate — if it lands on a paid channel you will be billed (~a small fraction of a cent at max_tokens 1024). To avoid billing: switch to Multi-channel and tick only free ones, or pin a free channel in Single mode.',mtFreeNote:'All source channels are free / free-quota. This test will not be billed.',mtUnknownWarn:'This model sits on a channel with no model-level free whitelist, so billing cannot be confirmed. Verify on the provider page before running.',mtNoMatch:'No matching model',mtMode:'Mode',mtModeSingle:'Single channel',mtModeMulti:'Multi-channel',mtModeSingleHint:'Pin one channel and test only it (bypasses the fallback chain). Pick “All channels” to let the gateway fall back.',mtModeMultiHint:'Fire the same model across several channels concurrently to compare speed and availability. Free channels are pre-selected; paid ones must be ticked manually.',mtTargetsT:'Channels to test',mtFreeCount:'free',mtNoTarget:'No testable channel for this model',mtRunHintMulti:'concurrent calls · max_tokens 1024',mtRunningMulti:'Testing {n} channels concurrently…',mtMultiSum:'Summary',mtOkN:'succeeded',mtTotal:'Total',
+ brandSub:'统一连接 · 智行无界',connInitial:'观测 API',connLive:'观测在线',connAuth:'需要鉴权',connOffline:'观测离线',
+ authBanner:'观测 API 需要鉴权',setCred:'设置凭据',greetHint:'点击切换显示实时时间',searchPh:'搜索模型、渠道、路由…',retry:'重试',
+ offlineProtected:'观测 API 受保护。请在设置中添加观测凭据。',offlineUnavail:'观测 API 不可达：',
+ gMorning:'早上好，',gAfternoon:'下午好，',gEvening:'晚上好，',gNight:'夜深了，',
+ topologyTitle:'请求路由拓扑',topologySub:'统一接入 · 精确路由 · 多元生态',
+ liveTitle:'实时遥测',reqLabel:'请求量',fbLabel:'回退深度',noLatencyNote:'当前观测 API 未提供请求延迟字段，因此不估算延迟。',admissionTitle:'成员准入序列',
+ kpiCalls:'今日调用',kpiSuccess:'调用成功率',kpiSuccessFoot:'（调用 − 错误）/ 调用',kpiFb:'平均回退',kpiFbFoot:'近期路由日志',kpiTok:'今日 Token',kpiTokFoot:'输入 + 输出 · 无时间序列',noSeries:'无序列',noAliasOpt:'无 alias',
+ sbNoCatalogT:'无路由目录',sbNoAliasesC:'/api/gateway-catalog 未返回任何 alias。',sbNoMatchT:'无匹配',sbNoMatchC:'换个筛选词试试。',
+ reqUser:'<strong>用户请求</strong>',aliasMeta:'统一模型 / alias',moreMembers:'更多成员',
+ srcMember:'成员池顺序',srcExplicit:'显式路由',srcObserved:'观测路由',fbOn:'已启用',fbOff:'已禁用',fbNone:'未声明',
+ stStandby:'备用 · 显式 backup',stCooldown:'冷却 · 推断 ≤30s',stTripped:'故障域 · 已跳闸',stProxy:'故障域 · 观测到 proxy_blocked',stDisabled:'已停用',stNoCred:'凭据缺失',stUnreach:'不可达',stBlocked:'限流 · blocked',stThrottled:'限流 · throttled',stFiltered:'被实时成员池过滤',stInelig:'不符合资格 · ',stHealthy:'健康 / 按序',
+ tagHealthy:'健康',tagCooldown:'冷却',tagFiltered:'过滤',tagStandby:'待命',tagUnavailable:'不可用',
+ adm01:'健康',adm02:'冷却',adm03:'故障域',adm04:'限流',adm05:'路由',
+ catalogTitle:'模型目录',catalogSub:'统一逻辑模型名 alias 是产品契约。这里展示 catalog 与成员池，不把上游路由细节伪装成产品模型。',catalogPh:'筛选 alias…',
+ cdNoDisplay:'无显示名',factBilling:'计费',factTier:'层级',factUse:'用途',factFb:'回退策略',polOn:'已启用',polOff:'未启用 / 未声明',
+ membersTitle:'成员 / 候选',membersNote:'声明顺序；状态仅来自可观测端点。',sbNoRouteT:'无声明路由',sbNoRouteC:'该 alias 无成员池或主路由。',
+ backupTitle:'显式备用链',backupNote:'因 fallback_policy.enabled=true 而展示。',noBackup:'无备用成员。',
+ roleMember:'成员',rolePrimary:'主路',roleBackup:'备用',roleObserved:'观测',elig:'符合资格',inelig:'不符合资格',
+ routesTitle:'路由管理',routesSub:'成员池按 <span class="mono">members[]</span> 原顺序选择；不渲染未实现的额度/延迟动态加权。显式 backup 仅在 <span class="mono">fallback_policy.enabled=true</span> 时展示。',
+ rtOrder:'路由顺序',selRule:'实际选择规则：',selMemberPool:'select_members() → members[] 原始顺序',selExplicit:'显式主路由',selLegacy:'旧式/提供商路由',noWeight:'不渲染额度/延迟动态加权。',
+ sbNoCandT:'无候选',sbNoCandC:'路由计划为空。',planTitle:'当前路由计划',fbPolicyTitle:'显式回退策略',fbPolicyNote:'禁用时不显示备用链。',fbHidden:'fallback_policy.enabled 不为 true，因此刻意不渲染备用链。',
+ latestTitle:'最近解析路由',latestNote:'route-log 证据',noLogYet:'该 alias 暂无路由日志。',sbNoRoutesT:'编排已清空',sbNoRoutesC:'路由编排与产品目录均已清空，当前所有模型走自动路由（免费渠道优先）。新建别名后即可在此配置。',
+ sbNoPlanCandT:'当前无候选',sbNoPlanCandC:'route-plan 端点未返回候选。成员池场景下，被冷却/故障域过滤的成员可能在资格构建前就已缺席。',
+ thNum:'#',thChannel:'渠道',thState:'状态',thModel:'模型',thEligible:'资格',thHealth:'健康',thRate:'限流',thReason:'原因',yes:'是',no:'否',
+ hEnabled:'启用',hDisabled:'停用',hKey:'有 key',hNoKey:'无 key',hReach:'可达',hUnreach:'不可达',
+ channelsTitle:'渠道注册表',channelsSub:'把健康、凭据、限流与用量分开表达。成员冷却、渠道限流、共享代理故障域从不合并成一个“健康”状态。',refreshHealth:'刷新健康',
+ liveRegistry:'实时注册表',credNote:'凭据状态永不回显明文 key，只显示「已配置/缺失」与掩码。',rateLedger:'限流台账',rateNote:'open / throttled / blocked 是渠道/凭据限流状态，与成员 30s 冷却、fault domain breaker 分开。',
+ thDay:'当日',thSkipped:'跳过',thSource:'来源',thNote:'备注',healthUnknown:'健康未知',
+ sbRegEmptyT:'注册表为空',sbRegEmptyC:'未返回渠道注册表或健康数据。',
+ credTrue:'已配置',credFalse:'缺失',credUnk:'未知',lblCredential:'凭据',lblRateLimit:'限流',lblCallsToday:'今日调用',lblErrorsToday:'今日错误',faultDomainP:'故障域',healthNoteP:'健康备注',srcUnknown:'未知',
+ rateEmpty:'限流台账为空。',remaining:'s 剩余',
+ logsTitle:'日志与追踪',logsSub:'直接展示路由日志真实字段：ts / client_model / route_source / attempted / resolved / fallback / errors / failures。',logPh:'筛选日志…',
+ thTime:'时间',thClient:'客户端模型',thAttempted:'尝试链路',thResolvedCh:'解析渠道',thResolvedModel:'解析模型',thFallback:'回退',thResult:'结果',
+ tagResolved:'成功',tagFailed:'失败',sbNoLogsT:'暂无路由日志',sbNoLogsC:'先通过网关发送一次请求，再刷新。',
+ analyticsTitle:'用量分析',analyticsSub:'只从 usage 与 route-log 计算可验证统计。没有延迟字段就明确留空，不制造“智能评分”。',
+ callsByChannel:'按渠道调用',tokensByChannel:'按渠道 Token',fbDist:'回退分布',recentFb:'近期回退占比',depthP:'深度 ',noData:'无实测数据。',
+ latencyNote:'<b>延迟留空。</b> 当前指定的观测端点与 route-log 字段没有 latency，因此本主题不渲染“842ms”一类占位数字。需要延迟图时，应由后端先提供真实字段。',
+ settingsTitle:'设置',settingsSub:'沿用 <span class="mono">data-theme</span> + <span class="mono">data-style</span> + <span class="mono">gw-accent</span> + localStorage。黑白建筑极简对应 style: <span class="mono">architect</span>。',
+ obsApi:'观测 API',apiBase:'API base URL',save:'保存',clear:'清除',obsCredLabel:'观测凭据 · 仅存于浏览器 localStorage',obsCredState:'观测凭据',lastRefresh:'最近刷新',
+ gwState:'网关状态',enabled:'启用开关',gwKey:'网关 API key',localUrl:'本机地址',lanUrl:'局域网地址',toggleGw:'切换网关启用',
+ appearance:'外观',style:'风格',styleVal:'Architect · 黑白建筑极简',theme:'主题',light:'亮色',dark:'暗色',accent:'强调色',accentVal:'单色锁定',
+ accentNote:'保留 gw-accent 键以兼容现有主题系统，但本 style 不用彩色 accent 破坏黑白建筑气质。',
+ truthTitle:'真实性边界',threeStates:'三种状态分开表达',
+ truth1:'成员冷却：30s，后端当前未直接暴露；UI 仅根据 member_pool 最近 breaker failure ≤30s 标为“inferred cooldown”。',
+ truth2:'限流：直接来自 /api/rate-limits 的 open / throttled / blocked。',
+ truth3:'故障域：仅在后端显式字段或 route-log 的 proxy_blocked 观测证据存在时表达；无证据时显示“live state not exposed”，不猜测。',
+ truth4:'成员选择：按 members[] 原顺序，不做额度+延迟动态加权。',
+ truth5:'备用链：只有 fallback_policy.enabled=true 才展示。',
+ tiersTitle:'三档免费线路由图',tiersNote:'箭头即回落顺序：调用按 members[] 从左到右逐个尝试，前面节点失败才落到下一个。速度标注为探针实测 tok/s（无实测则留空）。首跳=当前默认选中成员。节点虚线框=计费非免费池标注。',
+ tierMapEmpty:'暂无 free-* 三档路由（/api/gateway-catalog 未返回成员池）',tierTok:'tok/s',tierNoTok:'无实测',tierFirst:'首跳',tierPaid:'付费渠道成员（谨慎，不保证免费）',tierOfflineCh:'渠道未启用/不可达',
+ sConfigured:'已配置 · ••••••••',sMissing:'缺失 · ————',swEnabled:'已启用',swPaused:'已暂停',swUnknown:'未知',sUnknown:'未知 · ————',
+ toastBaseSaved:'API base 已保存',toastKeyStored:'观测凭据已存入本地',toastKeyCleared:'观测凭据已清除',toastPartial:'刷新完成，但部分端点出错',toastRefreshed:'数据已刷新',
+ toastSwUnknown:'网关启用状态未知，未执行切换。',confirmResume:'恢复 API 转发？',confirmPause:'暂停 API 转发？',toastGwOn:'网关已启用',toastGwOff:'网关已暂停',toastToggleFail:'切换失败：'
+},
+en:{
+ docTitle:'API Gateway',
+  nav_dashboard:'Dashboard',nav_catalog:'Model Catalog',nav_routes:'Route Management',nav_channels:'Channel Registry',nav_logs:'Logs & Traces',nav_analytics:'Analytics',nav_probes:'Model Benchmarks',nav_settings:'Settings',nav_modeltest:'Model Test',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'Model Benchmarks',probesSub:'Measured model benchmark facts: quality scores (0-100), throughput (tok/s), TTFT latency, and billing telemetry across 577+ models.',probesSearchPh:'Search model, series, or channel (e.g. qwen2.5, claude, groq)…',mtTitle:'Model Test',mtSub:'Pick a model and fire one real chat completion to verify it can run right now.',mtModel:'Model',mtPrompt:'Prompt',mtRun:'Run test',mtRunning:'Running…',mtResultT:'Test result',mtStatus:'Status',mtOk:'OK',mtFail:'FAIL',mtLatency:'Latency',mtUsage:'Usage',mtIdle:'No test run yet',mtIdleHint:'Confirm channel and model on the left, write a prompt, then hit Run. Results appear here.',mtPlanIdle:'Pick a model to load its candidate chain.',mtSetupT:'Test setup',mtPlanT:'Route plan (debug)',mtNote:'Each test fires one real chat completion (max_tokens 1024) and counts toward channel usage.',mtSearchPh:'Search models (enabled channels only)…',mtScopeNote:'models from enabled channels',mtScopeFallback:'full catalog (enabled channel list unavailable)',mtChannelT:'Channel',mtAllCh:'All enabled channels',mtFrom:'Source channels: ',mtPaidWarn:'Why this shows: some channels for this model bill per token (e.g. opencode / tokenrhythm). Run fires ONE request and the gateway picks the first available candidate — if it lands on a paid channel you will be billed (~a small fraction of a cent at max_tokens 1024). To avoid billing: switch to Multi-channel and tick only free ones, or pin a free channel in Single mode.',mtFreeNote:'All source channels are free / free-quota. This test will not be billed.',mtUnknownWarn:'This model sits on a channel with no model-level free whitelist, so billing cannot be confirmed. Verify on the provider page before running.',mtNoMatch:'No matching model',mtMode:'Mode',mtModeSingle:'Single channel',mtModeMulti:'Multi-channel',mtModeSingleHint:'Pin one channel and test only it (bypasses the fallback chain). Pick “All channels” to let the gateway fall back.',mtModeMultiHint:'Fire the same model across several channels concurrently to compare speed and availability. Free channels are pre-selected; paid ones must be ticked manually.',mtTargetsT:'Channels to test',mtFreeCount:'free',mtNoTarget:'No testable channel for this model',mtRunHintMulti:'concurrent calls · max_tokens 1024',mtRunningMulti:'Testing {n} channels concurrently…',mtMultiSum:'Summary',mtOkN:'succeeded',mtTotal:'Total',
  brandSub:'Unified access · Unbounded routing',connInitial:'OBSERVATION API',connLive:'OBSERVATION LIVE',connAuth:'AUTH REQUIRED',connOffline:'OBSERVATION OFFLINE',
  authBanner:'OBSERVATION API REQUIRES AUTHORIZATION',setCred:'SET CREDENTIAL',greetHint:'Click to toggle the live clock',searchPh:'Search model, channel, route…',retry:'Retry',
  offlineProtected:'Observation API is protected. Add the bearer credential in Settings.',offlineUnavail:'Observation API unavailable at ',
@@ -1499,10 +1783,11 @@ function memberStatus(alias,m){
 }
 async function loadAll(showToast=false){
   state.loading=true;state.errors=[];renderLoadingHints();
-  const [health,catalog,usage,rate,logs,sw,info,cold]=await Promise.all([
-    safe('/api/health'),safe('/api/gateway-catalog'),safe('/api/usage'),safe('/api/rate-limits'),safe('/api/route-log'),safe('/api/switch'),safe('/api/gateway-info'),safe('/api/cold-channels')
+  const [health,catalog,usage,rate,logs,sw,info,cold,cacheStats]=await Promise.all([
+    safe('/api/health'),safe('/api/gateway-catalog'),safe('/api/usage'),safe('/api/rate-limits'),safe('/api/route-log'),safe('/api/switch'),safe('/api/gateway-info'),safe('/api/cold-channels'),safe('/api/cache/stats')
   ]);
   if(health)state.health=health;if(catalog)state.catalog=catalog;if(usage)state.usage=usage;if(rate)state.rate=rate;if(logs)state.logs=logs.log||[];if(sw)state.switchState=sw;if(info)state.gatewayInfo=info;
+  if(cacheStats)state.cacheStats=cacheStats;
   /* 2026-09-18: 冷宫状态改由后端持久化（用户可自行打入/放出），前端只读回显 */
   if(cold)state.coldData=cold;
   ensureColdInit();
@@ -1543,16 +1828,176 @@ function renderDashboard(){
   if(state.loading&&!state.catalog){renderLoadingHints();return}renderKpis();
   const a=aliases();$('#dashboardAlias').innerHTML=a.length?a.map(x=>`<option value="${esc(x)}" ${x===state.selectedAlias?'selected':''}>${esc(x)}</option>`).join(''):`<option>${t('noAliasOpt')}</option>`;
   if(!a.length){$('#topologyStage').innerHTML=stateBox('000',t('sbNoCatalogT'),t('sbNoAliasesC'));return}
-  renderTopology(state.selectedAlias);renderTelemetry();renderAdmission(state.selectedAlias);
+  renderTopology(state.selectedAlias);renderTelemetry();renderAdmission(state.selectedAlias);renderCacheStats();
 }
 function stateBox(code,title,copy){return `<div class="state-box"><div class="state-code">${code}</div><div class="state-title">${esc(title)}</div><div class="state-copy">${esc(copy)}</div></div>`}
+function drawCircuitRails(){
+  const container=$('#topoContainer');
+  const svg=$('#topoCircuitSvg');
+  if(!container||!svg)return;
+  const cRect=container.getBoundingClientRect();
+  if(!cRect.width||!cRect.height)return;
+
+  const pIngress=$('#topoPinIngress');
+  const pRouterIn=$('#topoPinRouterIn');
+  const pRouterOut=$('#topoPinRouterOut');
+  if(!pIngress||!pRouterIn||!pRouterOut)return;
+
+  const rIng=pIngress.getBoundingClientRect();
+  const rRIn=pRouterIn.getBoundingClientRect();
+  const rROut=pRouterOut.getBoundingClientRect();
+
+  const x1=Math.round(rIng.left+rIng.width/2-cRect.left);
+  const y1=Math.round(rIng.top+rIng.height/2-cRect.top);
+  const x2=Math.round(rRIn.left+rRIn.width/2-cRect.left);
+  const y2=Math.round(rRIn.top+rRIn.height/2-cRect.top);
+
+  const x3=Math.round(rROut.left+rROut.width/2-cRect.left);
+  const y3=Math.round(rROut.top+rROut.height/2-cRect.top);
+
+  const midX1=Math.round(x1+(x2-x1)*0.5);
+  let paths=`<path class="circuit-rail rail-ingress" d="M ${x1} ${y1} C ${midX1} ${y1}, ${midX1} ${y2}, ${x2} ${y2}"></path>`;
+
+  const candPins=$$('.topo-candidate-pin');
+  candPins.forEach(pin=>{
+    const card=pin.closest('.topo-upstream-card');
+    const isCurrent=card&&card.classList.contains('is-current');
+    const pRect=pin.getBoundingClientRect();
+    const cx=Math.round(pRect.left+pRect.width/2-cRect.left);
+    const cy=Math.round(pRect.top+pRect.height/2-cRect.top);
+    const midX2=Math.round(x3+(cx-x3)*0.55);
+    const cls=isCurrent?'circuit-rail rail-active':'circuit-rail rail-candidate';
+    paths+=`<path class="${cls}" d="M ${x3} ${y3} C ${midX2} ${y3}, ${midX2} ${cy}, ${cx} ${cy}"></path>`;
+  });
+
+  svg.setAttribute('viewBox',`0 0 ${Math.round(cRect.width)} ${Math.round(cRect.height)}`);
+  svg.innerHTML=paths;
+}
+
 function renderTopology(alias){
-  const members=declaredCandidates(alias);const r=routeObj(alias)||{};const latest=latestLog(alias);const max=7;const shown=members.slice(0,max);const h=410;const n=Math.max(1,shown.length);const y0=40,y1=h-45;const ys=shown.map((_,i)=>n===1?h/2:y0+i*(y1-y0)/(n-1));
-  const paths=[];paths.push(`<path class="request-line" d="M 105 205 C 190 205, 235 205, 340 205"></path>`);
-  shown.forEach((m,i)=>{const st=memberStatus(alias,m);const y=ys[i];const current=latest&&latest.resolved_channel===m.channel;paths.push(`<path class="route-line ${st.cls} ${current?'current flow-dash':''}" d="M 420 205 C 525 205, 555 ${y}, 690 ${y}"></path>`)});
-  const nodes=shown.map((m,i)=>{const st=memberStatus(alias,m);const current=latest&&latest.resolved_channel===m.channel;return `<div class="member-node ${st.cls}" style="top:${ys[i]/h*100}%"><div class="member-dot">${current?'NOW':String(i+1).padStart(2,'0')}</div><div class="member-copy"><div class="member-name">${esc(m.channel||'—')}</div><div class="member-model">${esc(m.model||alias)}</div><div class="member-state">${esc(st.label)}</div></div></div>`}).join('');
-  const c=catalogObj(alias);const fallback=!!(r.fallback_policy&&r.fallback_policy.enabled);const source=r.members&&r.members.length?t('srcMember'):r.primary?t('srcExplicit'):(latest&&latest.route_source||t('srcObserved'));
-  $('#topologyStage').innerHTML=`<svg class="topology-svg" viewBox="0 0 920 410" preserveAspectRatio="none" aria-hidden="true">${paths.join('')}</svg><div class="request-node"><div class="request-dot"></div><div class="request-copy">${t('reqUser')}</div></div><div class="alias-core"><div class="alias-name">${esc(alias)}</div><div class="alias-meta">${esc(t('aliasMeta'))}</div></div>${nodes}${members.length>max?`<div class="member-node standby" style="top:94%"><div class="member-dot">+${members.length-max}</div><div class="member-copy"><div class="member-name">${t('moreMembers')}</div></div></div>`:''}`;
+  const stage=$('#topologyStage');
+  if(!stage)return;
+  const members=declaredCandidates(alias);
+  const r=routeObj(alias)||{};
+  const c=catalogObj(alias)||{};
+  const latest=latestLog(alias);
+  const fallback=!!(r.fallback_policy&&r.fallback_policy.enabled);
+  const source=r.members&&r.members.length?t('srcMember'):r.primary?t('srcExplicit'):(latest&&latest.route_source||t('srcObserved'));
+  const maxShown=5;
+  const shown=members.slice(0,maxShown);
+
+  const tokOf=(ch,md)=>{
+    const e=probesData&&probesData.channels&&probesData.channels[ch]&&probesData.channels[ch][md];
+    const v=e&&(e.performance||{}).tok_s_p50;
+    return v!=null?v.toFixed(1)+' tok/s':'';
+  };
+
+  const ingressHtml=`
+    <div class="topo-card topo-card-ingress">
+      <div class="topo-card-head">
+        <span class="topo-pulse-dot"></span>
+        <span class="topo-card-tag">01 / INGRESS</span>
+      </div>
+      <div class="topo-endpoint mono">POST /v1/chat/completions</div>
+      <div class="topo-card-title">客户端请求接入</div>
+      <div class="topo-meta-list">
+        <div class="topo-meta-row"><span>接入协议</span><strong class="mono">OpenAI Compatible</strong></div>
+        <div class="topo-meta-row"><span>鉴权模式</span><strong style="color:var(--emerald,#10b981)">Bearer Master</strong></div>
+        <div class="topo-meta-row"><span>流式补全</span><strong>SSE Stream</strong></div>
+      </div>
+      <div class="topo-pin topo-pin-out" id="topoPinIngress" title="接入出口"></div>
+    </div>
+  `;
+
+  const routerHtml=`
+    <div class="topo-card topo-card-router">
+      <div class="topo-pin topo-pin-in" id="topoPinRouterIn" title="核心路由入口"></div>
+      <div class="topo-card-head">
+        <span class="topo-card-tag">02 / ROUTER CORE</span>
+        <span class="tag ${c.tier?'solid':'dim'}" style="font-size:10px">${esc(c.tier||'ROUTE ALIAS')}</span>
+      </div>
+      <div class="topo-alias-name" title="${esc(alias)}">${esc(alias)}</div>
+      <div class="topo-alias-desc">${esc(c.display||c.use||(LANG==='zh'?'网关核心编排别名':'Gateway Orchestrated Alias'))}</div>
+      <div class="topo-matrix-grid">
+        <div class="topo-matrix-item">
+          <span class="m-lbl">决策源模式</span>
+          <span class="m-val">${esc(source)}</span>
+        </div>
+        <div class="topo-matrix-item">
+          <span class="m-lbl">容灾回退</span>
+          <span class="m-val" style="${fallback?'color:var(--emerald,#10b981)':''}">${fallback?(LANG==='zh'?'逐级尝试 (On)':'Enabled'):(LANG==='zh'?'未启用':'Disabled')}</span>
+        </div>
+        <div class="topo-matrix-item">
+          <span class="m-lbl">两级语义缓存</span>
+          <span class="m-val" style="color:var(--emerald,#10b981)">${LANG==='zh'?'~7.3ms 极速命中':'Active (~7ms)'}</span>
+        </div>
+        <div class="topo-matrix-item">
+          <span class="m-lbl">上游成员池</span>
+          <span class="m-val">${members.length} ${LANG==='zh'?'个声明节点':'candidates'}</span>
+        </div>
+      </div>
+      <div class="topo-pin topo-pin-out" id="topoPinRouterOut" title="候选分发出口"></div>
+    </div>
+  `;
+
+  const candidatesHtml=`
+    <div class="topo-upstream-wrap">
+      <div class="topo-upstream-head">
+        <span class="topo-card-tag">03 / UPSTREAM PIPELINE</span>
+        <span class="muted tiny">${LANG==='zh'?'按序回落尝试':'Fallback Walk'}</span>
+      </div>
+      <div class="topo-upstream-list">
+        ${(()=>{
+          let currentFound = false;
+          return shown.map((m,i)=>{
+            const st=memberStatus(alias,m);
+            let current = false;
+            if(!currentFound && latest && latest.resolved_channel === m.channel){
+              if(!latest.resolved_model || !m.model || latest.resolved_model === m.model){
+                current = true;
+                currentFound = true;
+              }
+            }
+            const spd=tokOf(m.channel,m.model);
+            return `
+            <div class="topo-upstream-card ${st.cls} ${current?'is-current':''}">
+              <div class="topo-pin topo-pin-in topo-candidate-pin"></div>
+              <div class="topo-u-rank ${current?'now':''}" style="${current?'background:#10b981;color:#fff;border-color:#10b981':''}">${current?'NOW':String(i+1).padStart(2,'0')}</div>
+              <div class="topo-u-body">
+                <div class="topo-u-top">
+                  <span class="topo-u-chan">${esc(m.channel)}</span>
+                  <span class="topo-u-role">${i===0?(LANG==='zh'?'首选节点':'Primary'):(LANG==='zh'?'备选节点':'Backup')}</span>
+                </div>
+                <div class="topo-u-model mono" title="${esc(m.model||alias)}">${esc(m.model||alias)}</div>
+              </div>
+              <div class="topo-u-right">
+                <span class="topo-u-status ${st.cls}">${esc(st.label)}</span>
+                ${spd?`<span class="topo-u-speed mono">${spd}</span>`:''}
+              </div>
+            </div>
+          `;
+          }).join('');
+        })()}
+        ${members.length>maxShown?`
+          <div class="topo-more-card">
+            <span>+${members.length-maxShown} ${LANG==='zh'?'个备用候选在列待命':'standby candidates ready'}</span>
+          </div>
+        `:''}
+      </div>
+    </div>
+  `;
+
+  stage.innerHTML=`
+    <div class="topo-pipeline-container" id="topoContainer">
+      <svg class="topo-circuit-svg" id="topoCircuitSvg" aria-hidden="true"></svg>
+      <div class="topo-col topo-col-left">${ingressHtml}</div>
+      <div class="topo-col topo-col-center">${routerHtml}</div>
+      <div class="topo-col topo-col-right">${candidatesHtml}</div>
+    </div>
+  `;
+
+  requestAnimationFrame(()=>drawCircuitRails());
+
   $('#topologyCaptionLeft').innerHTML=`<b>${esc(source)}</b> · ${LANG==='zh'?members.length+' 个已声明候选':members.length+' declared candidate'+(members.length===1?'':'s')}`;
   $('#topologyCaptionRight').textContent='fallback_policy: '+t(fallback?'fbOn':r.fallback_policy?'fbOff':'fbNone');
 }
@@ -2183,6 +2628,14 @@ function isPaidChannel(cid){
   return false;
 }
 function channelBillingTag(cid){
+  const h=healthObj(cid);
+  const custom=h&&typeof h.billing_tag==='string'?h.billing_tag.trim():'';
+  /* 渠道自定义标签只取短词上卡面（防溢出），完整说明收进 hover tooltip；无自定义则回退付费/免费二分 */
+  if(custom){
+    const icon=(custom.match(/^(🟢|🔴|❄️|✅|⚠️)/)||[''])[0];
+    const short=custom.replace(/^(🟢|🔴|❄️|✅|⚠️)\s*/,'').split(/[\s(（·：:]/)[0]||custom;
+    return `<span class="tag${/冷宫|付费|❄/.test(custom)?' dim':' free-badge'}" title="${esc(custom)}">${esc((icon?icon+' ':'')+short)}</span>`;
+  }
   const paid=isPaidChannel(cid);
   return paid
     ? `<span class="tag paid-badge" title="付费渠道：含按量/订阅/混合扣费模型">🔴 ${LANG==='zh'?'付费':'Paid'}</span>`
@@ -2350,7 +2803,33 @@ async function setSelectedAlias(a,which){if(!a)return;if(which==='dashboard')sta
    为什么不用 iframe：Chromium 对 iframe 画布强制不透明，CSS transparent 赢不了
    合成层——涂任何颜色都是一块实底，透不出控制台的建筑照片底图。原生 DOM 则
    天然透明：汇总/表格直接浮在 material-stage + paper-grain 上，与其它视图一致。 */
-let probesData=null,probesFilter='all',probesQ='',probesFetching=false;
+function renderCacheStats(){
+  const cs=state.cacheStats||{};
+  const act=$('#cacheActiveEntries');if(act)act.textContent=cs.active_entries!=null?fmt(cs.active_entries):'0';
+  const hits=$('#cacheHits');if(hits)hits.textContent=cs.total_hits!=null?fmt(cs.total_hits):'0';
+  const pill=$('#cacheStatusText');if(pill)pill.textContent=cs.status==='active'?'Active':'Idle';
+  const dot=$('.cache-dot');if(dot)dot.style.background=cs.status==='active'?'#10b981':'#6b7280';
+}
+
+function jumpToModelTest(ch, md){
+  state.mtChannel = ch || '';
+  state.mtModel = md || '';
+  navigate('modeltest');
+  toast(LANG==='zh'?`已选定【${md}】(${ch})，可直接点击「运行测试」`:`Selected ${md} (${ch}) for testing`);
+}
+
+let probesData=null, probesFetching=false;
+let probesState={
+  q:'',
+  preset:'all',
+  channel:'all',
+  access:'all',
+  billing:'all',
+  tier:'all',
+  sort:'qs_desc',
+  viewMode:'leaderboard'
+};
+
 function probesChip(a){
   if(a==='available')return '<span class="tag solid">✅ 可用</span>';
   if(a==='paid_required')return '<span class="tag">💰 需付费</span>';
@@ -2358,61 +2837,363 @@ function probesChip(a){
   if(a==='unknown')return '<span class="tag dim">❓ 未知</span>';
   return '<span class="tag dim">'+esc(a||'—')+'</span>';
 }
+
+function probesQuality(p){
+  if(!p||p.quality_score==null)return '<span class="muted tiny">未评测</span>';
+  const s=Number(p.quality_score).toFixed(1);
+  const t=p.quality_tier||'fair';
+  const map={
+    excellent:['q-excellent','● '+s+' 卓越'],
+    good:['q-good','● '+s+' 良好'],
+    fair:['q-fair','● '+s+' 一般'],
+    degraded:['q-degraded','▲ '+s+' 降级'],
+    offline:['q-offline','× 离线']
+  };
+  const item=map[t]||['q-fair','● '+s];
+  return `<span class="badge-quality ${item[0]}" title="综合质量评分: ${s} (${t})">${item[1]}</span>`;
+}
+
 function probesSpeed(p){
   const v=p&&p.tok_s_p50;
   if(v==null)return '<span class="muted tiny">—</span>';
   const extra=(p.samples_n&&p.samples_n>1)?` <span class="muted tiny">(${p.samples_n}次)</span>`:'';
   return `<code>${v.toFixed(1)}</code> <span class="muted tiny">tok/s</span>${extra}`;
 }
+
 function probesFmtTime(s){
   const m=String(s||'').match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
   return m?(m[1]+' '+m[2]):(s||'');
 }
-function probesTable(rows){
-  return `<div class="tablewrap"><table class="data-sheet"><thead><tr><th style="width:26px">#</th><th>模型</th><th>状态</th><th style="text-align:right">速度</th><th style="text-align:right">额度实测</th><th style="text-align:right">计费</th><th>观测时间</th></tr></thead><tbody>`
-    +rows.map((r,i)=>{
+
+function probesTable(rows, showChannel=true, currentSort='qs_desc'){
+  const sortCol = (currentSort.split('_')[0]) || 'qs';
+  const sortAsc = currentSort.endsWith('_asc');
+  
+  function thSort(col, label, align='left', width=''){
+    const isCur = (sortCol === col);
+    const arrow = isCur ? `<span class="sort-arrow">${sortAsc ? '▲' : '▼'}</span>` : '';
+    const style = `text-align:${align};${width ? 'width:'+width+';' : ''}`;
+    return `<th class="th-sortable ${isCur ? 'active' : ''}" data-sort-col="${col}" style="${style}" title="点击按 ${label} 排序">${label}${arrow}</th>`;
+  }
+
+  return `<div class="tablewrap"><table class="data-sheet"><thead><tr>`
+    + `<th style="width:26px">#</th>`
+    + thSort('name', '模型' + (showChannel ? ' / 渠道' : ''), 'left')
+    + `<th style="width:72px">状态</th>`
+    + thSort('qs', '综合质量', 'center', '92px')
+    + thSort('speed', '吞吐速度', 'right', '115px')
+    + thSort('ttft', '首字延迟', 'right', '95px')
+    + `<th style="text-align:right;width:115px">单次实测消耗</th>`
+    + `<th style="text-align:center;width:75px">计费模式</th>`
+    + `<th style="text-align:center;width:72px">操作</th>`
+    + `</tr></thead><tbody>`
+    + rows.map((r,i)=>{
       const b=r.e.billing||{};
       const cls=b.class==='free'?'<span class="tag solid">免费</span>':b.class==='paid'?'<span class="tag">付费</span>':'<span class="muted tiny">—</span>';
-      /* cost_sample = 探针单次真实调用的实测额度消耗（meter_unit 计价），非固有价 */
       const cs=b.cost_sample;
       const cost=cs?`<code>${cs.meter_value>=100?Math.round(cs.meter_value):cs.meter_value.toFixed(1)}</code> <span class="muted tiny">${esc(cs.meter_unit||'')}/次</span>`:'<span class="muted tiny">—</span>';
-      return `<tr><td class="num">${i+1}</td><td><code>${esc(r.md)}</code></td><td>${probesChip(r.a)}</td><td style="text-align:right">${probesSpeed(r.e.performance)}</td><td style="text-align:right">${cost}</td><td style="text-align:right">${cls}</td><td class="muted tiny">${probesFmtTime(r.e.observed_at)}</td></tr>`;
+      const p=r.e.performance||{};
+      const ttft=p.ttft_ms_p50!=null?`<code>${Math.round(p.ttft_ms_p50)}</code> <span class="muted tiny">ms</span>`:'<span class="muted tiny">—</span>';
+      const chanBadge=showChannel?`<div class="muted tiny" style="margin-top:2px"><span class="tag dim" style="padding:1px 5px;font-size:10px">${esc(r.ch)}</span></div>`:'';
+      return `<tr class="probe-data-row" data-ch="${esc(r.ch)}" data-md="${esc(r.md)}" style="cursor:pointer" title="点击展开/收起完整实测遥测指标">`
+        + `<td class="num">${i+1}</td>`
+        + `<td><div><code>${esc(r.md)}</code></div>${chanBadge}</td>`
+        + `<td>${probesChip(r.a)}</td>`
+        + `<td style="text-align:center">${probesQuality(p)}</td>`
+        + `<td style="text-align:right">${probesSpeed(p)}</td>`
+        + `<td style="text-align:right">${ttft}</td>`
+        + `<td style="text-align:right">${cost}</td>`
+        + `<td style="text-align:center">${cls}</td>`
+        + `<td style="text-align:center"><button class="ghost-btn probe-test-btn" data-ch="${esc(r.ch)}" data-md="${esc(r.md)}" style="height:24px;padding:0 8px;font-size:11px" title="带入测试台运行此模型">🚀 测试</button></td>`
+        + `</tr>`;
     }).join('')+'</tbody></table></div>';
 }
+
+function updateProbesChannelOptions(chs){
+  const sel=$('#probesChannelFilter');
+  if(!sel)return;
+  const currVal=probesState.channel;
+  const chNames=Object.keys(chs||{}).sort();
+  let opts=`<option value="all">${LANG==='zh'?'全部渠道 ('+chNames.length+' 个)':'All Channels ('+chNames.length+')'}</option>`;
+  chNames.forEach(ch=>{
+    const ms=chs[ch]||{};
+    const mKeys=Object.keys(ms);
+    const avCount=mKeys.filter(k=>ms[k].access_state==='available').length;
+    opts+=`<option value="${esc(ch)}">${esc(ch)} (${mKeys.length} 模型 · ${avCount} 可用)</option>`;
+  });
+  sel.innerHTML=opts;
+  if(currVal&&chNames.includes(currVal)){
+    sel.value=currVal;
+  }else{
+    probesState.channel='all';
+    sel.value='all';
+  }
+}
+
+function getFilteredProbes(flat){
+  const kw=probesState.q.toLowerCase();
+  const res=flat.filter(r=>{
+    if(kw && r.md.toLowerCase().indexOf(kw)<0 && r.ch.toLowerCase().indexOf(kw)<0) return false;
+    if(probesState.channel!=='all' && r.ch!==probesState.channel) return false;
+    if(probesState.access==='available' && r.a!=='available') return false;
+    if(probesState.access==='paid_required' && r.a!=='paid_required') return false;
+    if(probesState.access==='unknown' && (r.a==='available'||r.a==='paid_required')) return false;
+    if(probesState.billing==='free' && r.bClass!=='free') return false;
+    if(probesState.billing==='paid' && r.bClass!=='paid') return false;
+    if(probesState.tier==='70' && r.qs<70) return false;
+    if(probesState.tier==='90' && r.qs<90) return false;
+    if(probesState.tier==='good' && (r.qs<70 || r.qs>=90)) return false;
+    if(probesState.tier==='fair' && (r.qs<50 || r.qs>=70)) return false;
+    if(probesState.tier==='degraded' && r.qs>=50) return false;
+
+    // 快捷预设筛选
+    if(probesState.preset==='quality_70' && r.qs<70) return false;
+    if(probesState.preset==='fast' && (r.tok==null || r.tok<=0)) return false;
+    if(probesState.preset==='free_avail' && (r.a!=='available' || r.bClass!=='free')) return false;
+    if(probesState.preset==='low_ttft' && (r.ttft==null || r.ttft<=0)) return false;
+
+    return true;
+  });
+
+  const s=probesState.sort;
+  res.sort((x,y)=>{
+    if(s==='qs_desc') return (y.qs-x.qs)||((y.tok||0)-(x.tok||0))||x.md.localeCompare(y.md);
+    if(s==='qs_asc') return (x.qs-y.qs)||((x.tok||0)-(y.tok||0))||x.md.localeCompare(y.md);
+    if(s==='speed_desc') return ((y.tok||0)-(x.tok||0))||(y.qs-x.qs)||x.md.localeCompare(y.md);
+    if(s==='speed_asc') return ((x.tok||999999)-(y.tok||999999))||x.md.localeCompare(y.md);
+    if(s==='ttft_asc') return ((x.ttft||999999)-(y.ttft||999999))||(y.qs-x.qs);
+    if(s==='ttft_desc') return ((y.ttft||0)-(x.ttft||0));
+    if(s==='samples_desc') return ((y.samples||0)-(x.samples||0))||(y.qs-x.qs);
+    if(s==='name_asc') return x.md.localeCompare(y.md);
+    if(s==='name_desc') return y.md.localeCompare(x.md);
+    return 0;
+  });
+
+  return res;
+}
+
+function syncProbesConsoleUI(){
+  const qEl=$('#probesQ');if(qEl&&qEl.value!==probesState.q)qEl.value=probesState.q;
+  const chEl=$('#probesChannelFilter');if(chEl)chEl.value=probesState.channel;
+  const acEl=$('#probesAccessFilter');if(acEl)acEl.value=probesState.access;
+  const biEl=$('#probesBillingFilter');if(biEl)biEl.value=probesState.billing;
+  const tiEl=$('#probesTierFilter');if(tiEl)tiEl.value=probesState.tier;
+  const soEl=$('#probesSortSelect');if(soEl)soEl.value=probesState.sort;
+  $$('#probesPresets .probes-preset-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.preset === probesState.preset);
+  });
+  const vbL=$('#vbtnLeaderboard'), vbG=$('#vbtnGrouped');
+  if(vbL)vbL.classList.toggle('active', probesState.viewMode==='leaderboard');
+  if(vbG)vbG.classList.toggle('active', probesState.viewMode==='grouped');
+}
+
+function resetProbesFilters(){
+  probesState.q='';
+  probesState.preset='all';
+  probesState.channel='all';
+  probesState.access='all';
+  probesState.billing='all';
+  probesState.tier='all';
+  probesState.sort='qs_desc';
+  syncProbesConsoleUI();
+  renderProbesView();
+}
+
 function renderProbesView(){
   const box=$('#probesContent');if(!box)return;
   if(!probesData){box.innerHTML=`<div class="muted tiny">${probesFetching?'加载中…':'数据加载失败'}</div>`;return}
   const chs=probesData.channels||{};
   const chNames=Object.keys(chs).sort();
-  let total=0,av=0,pd=0,uk=0;const flat=[];
-  chNames.forEach(ch=>{const ms=chs[ch]||{};Object.keys(ms).forEach(md=>{const e=ms[md]||{};const a=e.access_state;total++;if(a==='available')av++;else if(a==='paid_required')pd++;else uk++;flat.push({ch,md,e,a,tok:(e.performance||{}).tok_s_p50});})});
-  $('#probesMeta').textContent=`revision ${probesData.revision} · 生成于 ${probesFmtTime(probesData.as_of)} · 共 ${chNames.length} 渠道`;
-  $('#probesSummary').innerHTML=[
-    ['模型总数',total,''],['✅ 实测可用',av,''],['💰 需付费',pd,''],['❓ 未知/下架',uk,'']
-  ].map(([k,v])=>`<div><div class="probes-summary-k">${k}</div><div class="probes-summary-v">${v}</div></div>`).join('');
-  const kw=probesQ.toLowerCase();
-  let show=flat.filter(r=>{
-    if(probesFilter==='available'||probesFilter==='paid_required'){if(r.a!==probesFilter)return false}
-    else if(probesFilter==='unknown'){if(r.a==='available'||r.a==='paid_required')return false}
-    if(probesFilter==='fast'&&r.tok==null)return false;
-    if(kw&&r.md.toLowerCase().indexOf(kw)<0)return false;
-    return true;
+  let total=0,av=0,pd=0,uk=0,hiQuality=0,hasSpeed=0;const flat=[];
+  chNames.forEach(ch=>{
+    const ms=chs[ch]||{};
+    Object.keys(ms).forEach(md=>{
+      const e=ms[md]||{};
+      const a=e.access_state;
+      total++;
+      if(a==='available')av++;
+      else if(a==='paid_required')pd++;
+      else uk++;
+      const p=e.performance||{};
+      const b=e.billing||{};
+      if(p.quality_score!=null&&p.quality_score>=70)hiQuality++;
+      if(p.tok_s_p50!=null)hasSpeed++;
+      flat.push({
+        ch, md, e, a,
+        tok: p.tok_s_p50,
+        ttft: p.ttft_ms_p50,
+        samples: p.samples_n||0,
+        qs: p.quality_score||0,
+        bClass: b.class
+      });
+    });
   });
-  if(probesFilter==='fast'){show.sort((x,y)=>y.tok-x.tok);
-    box.innerHTML=`<div class="probes-chan"><div class="probes-chan-head"><h3>⚡ 全渠道速度榜</h3><span class="cnt">${show.length} 个模型（有实测速度）</span></div>${probesTable(show)}</div>`;
+
+  const avPct=total?Math.round(av/total*100):0;
+  $('#probesMeta').textContent=`revision ${probesData.revision} · 生成于 ${probesFmtTime(probesData.as_of)} · 共 ${chNames.length} 个渠道`;
+  $('#probesSummary').innerHTML=[
+    [LANG==='zh'?'模型总数':'Total Models', total, ''],
+    [LANG==='zh'?'✅ 实测可用':'Available', av, `<small>(${avPct}%)</small>`],
+    [LANG==='zh'?'🏆 优质推荐':'Top Quality', hiQuality, '<small>(≥70分)</small>'],
+    [LANG==='zh'?'⚡ 测速覆盖':'Measured Speed', hasSpeed, '<small>(实测 tok/s)</small>'],
+    [LANG==='zh'?'💰 需付费':'Paid Required', pd, '']
+  ].map(([k,v,sub])=>`<div><div class="probes-summary-k">${k}</div><div class="probes-summary-v">${v} ${sub||''}</div></div>`).join('');
+
+  // 动态更新渠道下拉列表（若未初始化或数量变动）
+  const chFilter=$('#probesChannelFilter');
+  if(chFilter && chFilter.options.length<=1){
+    updateProbesChannelOptions(chs);
+  }
+
+  const show=getFilteredProbes(flat);
+
+  // 更新已匹配角标
+  const badge=$('#probesCountBadge');
+  if(badge)badge.innerHTML=`已匹配 <b>${show.length}</b> / ${total} 款模型`;
+
+  // 重置按钮显隐
+  const isFiltered=probesState.q!==''||probesState.preset!=='all'||probesState.channel!=='all'||probesState.access!=='all'||probesState.billing!=='all'||probesState.tier!=='all'||probesState.sort!=='qs_desc';
+  const rBtn=$('#probesResetBtn');
+  if(rBtn)rBtn.classList.toggle('show', isFiltered);
+
+  if(!show.length){
+    box.innerHTML=`<div class="card" style="padding:40px 20px;text-align:center;background:var(--card-sub)"><div style="font-size:28px;margin-bottom:8px">🔍</div><div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">未找到符合当前筛选条件的模型</div><div class="muted tiny">请尝试调整搜索关键词、放宽评分范围或 <a href="javascript:void(0)" id="emptyResetLink" style="color:var(--accent);text-decoration:underline;cursor:pointer">重置全部筛选</a></div></div>`;
+    const elnk=$('#emptyResetLink');if(elnk)elnk.addEventListener('click',resetProbesFilters);
     return;
   }
+
+  if(probesState.viewMode==='leaderboard'){
+    let title='📊 全网天梯大榜';
+    let subtitle=`${show.length} 款模型全网跨渠道实测对比`;
+    if(probesState.preset==='quality_70'){title='🏆 全网优质模型榜';subtitle=`${show.length} 个优质模型（综合质量评分 ≥70）`;}
+    else if(probesState.preset==='fast'){title='⚡ 全渠道速度榜';subtitle=`${show.length} 个模型（实测吞吐速率）`;}
+    else if(probesState.preset==='free_avail'){title='🟢 纯免费可用专区';subtitle=`${show.length} 个实测可用且零扣费模型`;}
+    else if(probesState.preset==='low_ttft'){title='⏱ 低延迟先锋榜';subtitle=`${show.length} 个低首字延迟响应模型`;}
+
+    box.innerHTML=`<div class="probes-chan"><div class="probes-chan-head"><h3>${title}</h3><span class="cnt">${subtitle}</span></div>${probesTable(show, true, probesState.sort)}</div>`;
+    return;
+  }
+
+  // 渠道分组模式
   let html='';
   chNames.forEach(ch=>{
     const rows=show.filter(r=>r.ch===ch);if(!rows.length)return;
     const n=rows.length,a=rows.filter(r=>r.a==='available').length,p=rows.filter(r=>r.a==='paid_required').length;
     const pct=n?Math.round(a/n*100):0;
-    html+=`<div class="probes-chan"><div class="probes-chan-head"><h3>${esc(ch)}</h3><span class="cnt">${n} 模型 · ${a} 可用${p?' · '+p+' 需付费':''}</span><span class="bar"><i style="width:${pct}%"></i></span></div>${probesTable(rows)}</div>`;
+    html+=`<div class="probes-chan"><div class="probes-chan-head"><h3>${esc(ch)}</h3><span class="cnt">${n} 模型 · ${a} 可用${p?' · '+p+' 需付费':''}</span><span class="bar"><i style="width:${pct}%"></i></span></div>${probesTable(rows, false, probesState.sort)}</div>`;
   });
-  box.innerHTML=html||'<div class="muted tiny">没有匹配的模型</div>';
+  box.innerHTML=html;
 }
+
+let probesEventsBound=false;
+function bindProbesEvents(){
+  if(probesEventsBound)return;
+  probesEventsBound=true;
+
+  const qInput=$('#probesQ');
+  if(qInput){
+    let qTimer=null;
+    qInput.addEventListener('input',e=>{
+      clearTimeout(qTimer);
+      qTimer=setTimeout(()=>{
+        probesState.q=e.target.value.trim();
+        renderProbesView();
+      }, 100);
+    });
+  }
+
+  const presetWrap=$('#probesPresets');
+  if(presetWrap){
+    presetWrap.addEventListener('click',e=>{
+      const btn=e.target.closest('.probes-preset-btn');
+      if(!btn)return;
+      probesState.preset=btn.dataset.preset;
+      syncProbesConsoleUI();
+      renderProbesView();
+    });
+  }
+
+  const chSel=$('#probesChannelFilter');
+  if(chSel)chSel.addEventListener('change',e=>{probesState.channel=e.target.value;renderProbesView()});
+  const acSel=$('#probesAccessFilter');
+  if(acSel)acSel.addEventListener('change',e=>{probesState.access=e.target.value;renderProbesView()});
+  const biSel=$('#probesBillingFilter');
+  if(biSel)biSel.addEventListener('change',e=>{probesState.billing=e.target.value;renderProbesView()});
+  const tiSel=$('#probesTierFilter');
+  if(tiSel)tiSel.addEventListener('change',e=>{probesState.tier=e.target.value;renderProbesView()});
+  const soSel=$('#probesSortSelect');
+  if(soSel)soSel.addEventListener('change',e=>{probesState.sort=e.target.value;renderProbesView()});
+
+  const vbL=$('#vbtnLeaderboard');
+  if(vbL)vbL.addEventListener('click',()=>{
+    probesState.viewMode='leaderboard';
+    syncProbesConsoleUI();
+    renderProbesView();
+  });
+  const vbG=$('#vbtnGrouped');
+  if(vbG)vbG.addEventListener('click',()=>{
+    probesState.viewMode='grouped';
+    syncProbesConsoleUI();
+    renderProbesView();
+  });
+
+  const rBtn=$('#probesResetBtn');
+  if(rBtn)rBtn.addEventListener('click',()=>resetProbesFilters());
+
+  document.addEventListener('click',e=>{
+    const th=e.target.closest('#probesContent th.th-sortable');
+    if(th){
+      const col=th.dataset.sortCol;
+      const curCol=probesState.sort.split('_')[0];
+      const curAsc=probesState.sort.endsWith('_asc');
+      let nextSort='';
+      if(curCol===col){
+        nextSort=col+'_'+(curAsc?'desc':'asc');
+      }else{
+        if(col==='name')nextSort='name_asc';
+        else if(col==='ttft')nextSort='ttft_asc';
+        else nextSort=col+'_desc';
+      }
+      probesState.sort=nextSort;
+      syncProbesConsoleUI();
+      renderProbesView();
+      return;
+    }
+
+    const tBtn=e.target.closest('.probe-test-btn');
+    if(tBtn){
+      e.stopPropagation();
+      jumpToModelTest(tBtn.dataset.ch, tBtn.dataset.md);
+      return;
+    }
+
+    const row=e.target.closest('.probe-data-row');
+    if(row&&!e.target.closest('button')&&!e.target.closest('a')){
+      const nx=row.nextElementSibling;
+      if(nx&&nx.classList.contains('probe-detail-row')){
+        nx.remove();
+        row.classList.remove('expanded');
+        return;
+      }
+      row.classList.add('expanded');
+      const ch=row.dataset.ch,md=row.dataset.md;
+      const item=probesData&&probesData.channels&&probesData.channels[ch]&&probesData.channels[ch][md];
+      if(!item)return;
+      const perf=item.performance||{};
+      const bill=item.billing||{};
+      const cs=bill.cost_sample||{};
+      const succ=perf.success_rate!=null?Math.round(perf.success_rate*100)+'%':'—';
+      const conf=perf.confidence!=null?Math.round(perf.confidence*100)+'%':'—';
+      const ewma=perf.tok_s_ewma!=null?perf.tok_s_ewma.toFixed(1)+' tok/s':'—';
+      const ttft=perf.ttft_ms_p50!=null?Math.round(perf.ttft_ms_p50)+' ms':'—';
+      row.insertAdjacentHTML('afterend',`<tr class="probe-detail-row"><td colspan="9" style="padding:10px 16px;background:var(--card-sub);border-bottom:1px solid var(--line-2)"><div style="display:flex;gap:24px;flex-wrap:wrap;font-size:11px;font-family:var(--font-mono)"><div><span class="muted">首字延迟(TTFT):</span> <b>${ttft}</b></div><div><span class="muted">EWMA吞吐:</span> <b>${ewma}</b></div><div><span class="muted">实测采样:</span> <b>${perf.samples_n||0} 次</b></div><div><span class="muted">成功率:</span> <b>${succ}</b></div><div><span class="muted">置信度:</span> <b>${conf}</b></div><div><span class="muted">单次实测消耗:</span> <b>${cs.meter_value!=null?(cs.meter_value>=100?Math.round(cs.meter_value):cs.meter_value.toFixed(1))+' '+(cs.meter_unit||''):'免费/赠送'}</b></div><div><span class="muted">最近观测:</span> <b>${probesFmtTime(item.observed_at)}</b></div></div></td></tr>`);
+    }
+  });
+}
+
 async function renderProbes(){
   const m=document.querySelector('main.main');if(m)m.scrollTop=0;
+  bindProbesEvents();
   if(probesData||probesFetching){renderProbesView();return}
   probesFetching=true;renderProbesView();
   try{
@@ -2423,16 +3204,12 @@ async function renderProbes(){
   }
   probesFetching=false;renderProbesView();
 }
-document.addEventListener('click',e=>{
-  const tab=e.target.closest('#probesFilters .filter-tab');
-  if(tab){$$('#probesFilters .filter-tab').forEach(x=>x.classList.remove('on'));tab.classList.add('on');probesFilter=tab.dataset.f;renderProbesView()}
-});
 function bind(){
   document.addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(b){navigate(b.dataset.nav)}const tab=e.target.closest('#channelFilterTabs .filter-tab');if(tab){state.channelFilter=tab.dataset.filter;renderChannels();}});
   $('#langBtn').addEventListener('click',()=>setLang(LANG==='zh'?'en':'zh'));
   $('#greetingTitle').addEventListener('click',toggleGreet);
-  window.addEventListener('hashchange',renderRoute);$('#dashboardAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'dashboard'));$('#routeAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'routes'));$('#catalogFilter').addEventListener('input',renderCatalog);$('#logFilter').addEventListener('input',renderLogs);$('#globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter')globalSearchAction()});
-  $('#probesQ').addEventListener('input',e=>{probesQ=e.target.value.trim();renderProbesView()});
+  window.addEventListener('hashchange',renderRoute);window.addEventListener('resize',()=>{if(state.active==='dashboard')drawCircuitRails()});$('#dashboardAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'dashboard'));$('#routeAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'routes'));$('#catalogFilter').addEventListener('input',renderCatalog);$('#logFilter').addEventListener('input',renderLogs);$('#globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter')globalSearchAction()});
+  bindProbesEvents();
   $('#refreshBtn').addEventListener('click',()=>loadAll(true));$('#channelsRefresh').addEventListener('click',()=>loadAll(true));$('#offlineRetry').addEventListener('click',()=>loadAll(true));
   $('#themeBtn').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));$$('[data-theme-choice]').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.themeChoice)));
   document.addEventListener('click',e=>{const x=e.target.closest('[data-catalog-alias]');if(x){state.catalogAlias=x.dataset.catalogAlias;loadPlan(state.catalogAlias).then(renderCatalog)}const row=e.target.closest('.log-row');if(row){
@@ -2447,6 +3224,44 @@ function bind(){
   $('#saveObserverKey').addEventListener('click',()=>{const v=$('#observerKeyInput').value.trim();if(v)localStorage.setItem('gw-api-key',v);$('#observerKeyInput').value='';state.authNeeded=false;$('#authBanner').classList.remove('show');toast(t('toastKeyStored'));loadAll()});
   $('#clearObserverKey').addEventListener('click',()=>{localStorage.removeItem('gw-api-key');$('#observerKeyInput').value='';toast(t('toastKeyCleared'));renderSettings()});
   $('#toggleGateway').addEventListener('click',toggleGateway);
+
+  // 语义缓存清空
+  const purgeBtn=$('#purgeCacheBtn');
+  if(purgeBtn){
+    purgeBtn.addEventListener('click',async()=>{
+      if(!confirm(LANG==='zh'?'确定要清空全部两级本地语义缓存与精确缓存吗？清空后将从上游重新生成。':'Purge all semantic and exact cache entries?'))return;
+      try{
+        await apiFetch('/api/cache/clear',{method:'POST'});
+        toast(LANG==='zh'?'语义缓存已完全清空':'Cache purged successfully');
+        const updated=await safe('/api/cache/stats');
+        if(updated){state.cacheStats=updated;renderCacheStats();}
+      }catch(e){
+        toast((LANG==='zh'?'清空缓存失败: ':'Failed to purge cache: ')+e.message,true);
+      }
+    });
+  }
+
+  // 探针重算
+  const runPBtn=$('#runProbesBtn');
+  if(runPBtn){
+    runPBtn.addEventListener('click',async()=>{
+      runPBtn.disabled=true;
+      const oldTxt=runPBtn.textContent;
+      runPBtn.textContent=LANG==='zh'?'⏳ 正在重算…':'⏳ Running…';
+      try{
+        const res=await apiFetch('/api/probes/run',{method:'POST'});
+        toast(LANG==='zh'?`探针事实重算完成 (Revision ${res&&res.result&&res.result.revision||'最新'})`:'Probes updated');
+        probesData=await apiFetch('/api/model-state');
+        renderProbesView();
+      }catch(e){
+        toast((LANG==='zh'?'探针重算失败: ':'Probe run failed: ')+e.message,true);
+      }finally{
+        runPBtn.disabled=false;
+        runPBtn.textContent=oldTxt;
+      }
+    });
+  }
+
 }
 function setTheme(t){document.documentElement.dataset.theme=t;localStorage.setItem('gw-theme',t);localStorage.setItem('gw-style','architect');renderSettings();}
 async function toggleGateway(){const cur=state.switchState&&state.switchState.enabled;if(typeof cur!=='boolean'){toast(t('toastSwUnknown'),true);return}const next=!cur;const ok=confirm((next?t('confirmResume'):t('confirmPause')));if(!ok)return;try{const d=await apiFetch('/api/switch',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:next})});state.switchState=d;toast(next?t('toastGwOn'):t('toastGwOff'));renderSettings()}catch(e){toast(t('toastToggleFail')+e.message,true)}}
