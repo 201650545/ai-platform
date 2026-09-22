@@ -180,11 +180,15 @@ def qwen_poll(job, session):
 
 
 QWEN_DEL_CHAT = ("async ()=>{"
+                 "const ctl=new AbortController(); setTimeout(()=>ctl.abort(),10000);"
+                 "try{"
                  "const r=await fetch('/api/v2/chats/__CID__',{method:'DELETE',credentials:'include',"
+                 "signal:ctl.signal,"
                  "headers:{'Accept':'application/json','X-Request-Id':crypto.randomUUID(),"
                  "'Version':'0.2.91','source':'web',"
                  "'Authorization':'Bearer '+localStorage.token}});"
-                 "return {status:r.status};" "}")
+                 "return {status:r.status};"
+                 "}catch(e){return {aborted:true};}" "}")
 
 
 def qwen_del_chat_async(cid, session):
@@ -204,9 +208,12 @@ def qwen_iter_sse(cid, model, prompt, session):
     job = qwen_send(cid, model, prompt, session)
     t0 = time.time()
     usage = None
+    got_any = False
     try:
         while True:
             lines, done = qwen_poll(job, session)
+            if lines:
+                got_any = True
             for ln in lines:
                 try:
                     ev = json.loads(ln)
@@ -226,6 +233,9 @@ def qwen_iter_sse(cid, model, prompt, session):
                 if usage:
                     yield "", usage
                 return
+            if not got_any and time.time() - t0 > 75:
+                # 上游偶发风控挂起：新会话+completions 无响应（UI 正常），快速失败让回落链接管
+                raise RuntimeError("上游 75s 无首包（疑似风控挂起），建议稍后重试")
             if time.time() - t0 > 230:
                 raise RuntimeError("收割超时")
             time.sleep(0.35)
