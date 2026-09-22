@@ -79,13 +79,39 @@ def _allow_via_snapshot(ch, model):
 
 
 def blocked(cid, model):
-    """返回 None=放行；否则 (reason, cid) 说明为何拒。只管 guard 配置登记的渠道。"""
+    """返回 None=放行；否则 (reason, cid) 说明为何拒。只管 guard 配置登记的渠道。
+
+    渠道级余额警戒（郭老师 2026-09-22 全局规则：一切付费/限额渠道 20% 警戒线）：
+    ch["balance"] = {"total": X, "remaining": Y}            → 比例模式，剩余 ≤warn_pct% 全渠道拒
+                  = {"remaining": Y, "warn_below": Z}       → 绝对模式，余额 ≤Z（元）全渠道拒
+                  = {..., "monitor_only": true}             → 只写警报不拦截（余额口径存疑时用）
+    余额数据由 scripts/balance_watch.py 每日刷新（mtime 热加载即生效）。
+    """
     doc = _load()
     if doc is None:
         return None  # 未部署过 guard 文件 → 未登记渠道语义，零干预
     ch = doc.get("channels", {}).get(cid)
     if ch is None:
         return None
+    # —— 渠道级余额警戒（先于模型级判定）——
+    bal = ch.get("balance")
+    if bal is not None:
+        try:
+            remaining = float(bal.get("remaining") or 0)
+        except (TypeError, ValueError):
+            remaining = 0.0
+        if "warn_below" in bal:
+            threshold = float(bal["warn_below"])
+        elif "total" in bal:
+            try:
+                threshold = float(bal["total"] or 0) * _warn_pct(ch, doc) / 100.0
+            except (TypeError, ValueError):
+                threshold = 0.0
+        else:
+            threshold = 0.0
+        if remaining <= threshold:
+            if not bal.get("monitor_only"):
+                return ("guard_balance_warnline", cid)
     model = (model or "").strip()
     policy = ch.get("policy")
     if policy == "deny_all":
@@ -121,8 +147,13 @@ def status_payload():
     out = {"loaded": True, "updated": doc.get("updated"), "warn_pct": doc.get("warn_pct", 20),
            "channels": {}}
     for cid, ch in doc.get("channels", {}).items():
+        bal = ch.get("balance")
         entry = {"policy": ch.get("policy"), "note": ch.get("note"),
-                 "allow_source": ch.get("allow_source"), "models": {}}
+                 "allow_source": ch.get("allow_source"), "min_total": ch.get("min_total"),
+                 "balance": ({"remaining": bal.get("remaining"), "total": bal.get("total"),
+                              "warn_below": bal.get("warn_below"),
+                              "monitor_only": bool(bal.get("monitor_only"))} if bal else None),
+                 "models": {}}
         for m, rec in (ch.get("models") or {}).items():
             try:
                 total = float(rec.get("total") or 0)

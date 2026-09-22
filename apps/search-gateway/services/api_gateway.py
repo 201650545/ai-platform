@@ -1458,7 +1458,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                     # （文本放 assistant 消息 + audio 参数），返回 base64 音频。
                     # voice=预置音色名（冰糖/茉莉/苏打/白桦/Mia/Chloe/Milo/Dean）直接用；
                     # 其他值忽略（避免把外来音色名当风格指令），缺省 冰糖。
+                    # 余额警戒（全局规则）：mimo 渠道余额 ≤20% 时 quota_guard 拦截。
                     _MIMO_VOICES = {"冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean"}
+                    gq = quota_guard.blocked("mimo", model or "mimo-v2.5-tts")
+                    if gq is not None:
+                        last_err = "mimo: " + gq[0]
+                        continue
                     ch = channels.CHANNELS.get("mimo")
                     key = channels.get_key("mimo")
                     if ch and key:
