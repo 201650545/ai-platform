@@ -1453,6 +1453,42 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "input 必填"})
                 return
             for cid, model in catalog_routes.healthy_members("voice-tts"):
+                if cid == "mimo":
+                    # 小米 MiMo-TTS 特判（2026-09-22，价格限时免费）：chat 风格接口
+                    # （文本放 assistant 消息 + audio 参数），返回 base64 音频。
+                    # voice=预置音色名（冰糖/茉莉/苏打/白桦/Mia/Chloe/Milo/Dean）直接用；
+                    # 其他值忽略（避免把外来音色名当风格指令），缺省 冰糖。
+                    _MIMO_VOICES = {"冰糖", "茉莉", "苏打", "白桦", "Mia", "Chloe", "Milo", "Dean"}
+                    ch = channels.CHANNELS.get("mimo")
+                    key = channels.get_key("mimo")
+                    if ch and key:
+                        import base64 as _b64mod
+                        voice = payload.get("voice") or "冰糖"
+                        if voice not in _MIMO_VOICES:
+                            voice = "冰糖"
+                        p2 = {"model": model or "mimo-v2.5-tts",
+                              "messages": [{"role": "assistant", "content": payload["input"]}],
+                              "audio": {"format": "mp3", "voice": voice}}
+                        req = _ur.Request(ch["base_url"].rstrip("/") + "/chat/completions",
+                                          data=json.dumps(p2).encode(), method="POST")
+                        req.add_header("Content-Type", "application/json")
+                        req.add_header("Authorization", "Bearer " + key)
+                        req.add_header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                        try:
+                            with _ur.urlopen(req, timeout=120) as r:
+                                resp_json = json.loads(r.read().decode("utf-8", "ignore"))
+                            audio_b64 = resp_json["choices"][0]["message"]["audio"]["data"]
+                            resp_body = _b64mod.b64decode(audio_b64)
+                            self.send_response(200)
+                            self.send_header("Content-Type", "audio/mpeg")
+                            self.send_header("X-TTS-Provider", "mimo")
+                            self.send_header("Content-Length", str(len(resp_body)))
+                            self.end_headers()
+                            self.wfile.write(resp_body)
+                            return
+                        except (_ur.HTTPError, Exception):  # noqa: BLE001 — 失败落下一个成员
+                            continue
+                    continue
                 if cid == "edge-tts":
                     # 本地零成本补席（2026-09-22）：Edge-TTS（微软在线音色，免费无限）。
                     # 走独立 venv（.venv-edge）子进程合成；voice 缺省中文晓晓，
