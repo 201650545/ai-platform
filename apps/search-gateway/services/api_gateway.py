@@ -733,12 +733,11 @@ def route_completion(payload, tenant=None):
         "resolved_model": None,
         "resolved_class": None,
         "fallback_count": 0,
-        "errors": [],
+        "errors": ["%s: %s（额度警戒闸门预过滤）" % (f["channel"], f["outcome"]) for f in _gq_failures],
         "failures": list(_gq_failures),  # 预过滤剔除留痕
     }
-
-    errors = []
-    failures = []
+    errors = list(log_entry["errors"])  # 预过滤拒绝进入最终错误信息（cid=None 时返回给调用方）
+    failures = list(_gq_failures)
     required_caps = capabilities.required_capabilities(payload)
     deadline = time.monotonic() + fault_domains.config().get("request_deadline_s", 30)
     for i, (cid, real_model) in enumerate(chain):
@@ -1546,6 +1545,14 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         if not key:
             self._send_json(400, {"error": "渠道 " + cid + " 未配置 key"})
             return
+        # 生图额度闸门（2026-09-22）：seedream/seededit→ark 走 ark-image 独立白名单
+        # （张计价，与聊天路由的 250 万 token 门槛分开）；无免费额度模型（如 5.0-pro
+        # 0.30-0.60 元/张）默认拦，防生图烧钱。sensetime 公测免费不设闸。
+        if cid == "ark":
+            gq = quota_guard.blocked("ark-image", model)
+            if gq is not None:
+                self._send_json(403, {"error": "生图闸门拦截：该模型无免费额度或额度耗尽（quota_guard: " + gq[0] + "）"})
+                return
         url = channels.CHANNELS[cid]["base_url"].rstrip("/") + "/images/generations"
         req = urllib.request.Request(
             url, data=json.dumps(payload).encode("utf-8"),
