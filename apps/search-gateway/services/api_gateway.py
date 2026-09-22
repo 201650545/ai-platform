@@ -1453,6 +1453,34 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "input 必填"})
                 return
             for cid, model in catalog_routes.healthy_members("voice-tts"):
+                if cid == "edge-tts":
+                    # 本地零成本补席（2026-09-22）：Edge-TTS（微软在线音色，免费无限）。
+                    # 走独立 venv（.venv-edge）子进程合成；voice 缺省中文晓晓，
+                    # 仅接受 Edge 风格音色名（含 Neural），其他值回退缺省。
+                    import subprocess as _sp
+                    import tempfile as _tf
+                    voice = payload.get("voice") or "zh-CN-XiaoxiaoNeural"
+                    if "Neural" not in voice:
+                        voice = "zh-CN-XiaoxiaoNeural"
+                    try:
+                        out = _tf.gettempdir() + "\\edge_tts_out_%d.mp3" % _sp.os.getpid()
+                        r = _sp.run([r"D:\项目\ai-hub\search_gateway\.venv-edge\Scripts\python.exe",
+                                     "-m", "edge_tts", "--voice", voice,
+                                     "--text", payload["input"], "--write-media", out],
+                                    timeout=60, capture_output=True)
+                        if r.returncode != 0 or not _sp.os.path.exists(out):
+                            raise RuntimeError(r.stderr.decode("utf-8", "ignore")[:150])
+                        with open(out, "rb") as f:
+                            resp_body = f.read()
+                        _sp.os.remove(out)
+                        self.send_response(200)
+                        self.send_header("Content-Type", "audio/mpeg")
+                        self.send_header("Content-Length", str(len(resp_body)))
+                        self.end_headers()
+                        self.wfile.write(resp_body)
+                        return
+                    except Exception:  # noqa: BLE001 — 合成失败落下一个成员
+                        continue
                 ch = channels.CHANNELS.get(cid)
                 key = channels.get_key(cid)
                 if not ch or not key:
