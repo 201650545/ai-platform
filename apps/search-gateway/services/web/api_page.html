@@ -1793,6 +1793,7 @@ async function renderOps(){
       const st=a.page_ready?(a.login===false?'no-login':'ready'):'page-missing';
       wh+=`<div class="ops-row"><span class="k">${esc(k)}</span><span class="v">${dot(st==='ready'?'ok':(st==='page-missing'?'warn':'idle'))}${esc(st)}</span></div>`;
     }
+    if(d.jev){wh+=`<div class="ops-row"><span class="k">jev 决策渠道（${esc(d.jev.model)}）</span><span class="v">${dot(d.jev.key_configured?'ok':'bad')}${d.jev.key_configured?'就绪 /v1/jev':'无key'}</span></div>`;}
     $('#opsWeb2api').innerHTML=wh;
     $('#opsBalances').innerHTML=(d.balances||[]).map(b=>{
       const pct=(b.total&&b.remaining!=null)?(b.remaining/b.total*100):null;

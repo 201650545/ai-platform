@@ -1921,6 +1921,39 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 return
             self._send_json(200, build_route_plan(data.get("model", ""), payload=data))
             return
+        if path == "/v1/jev":
+            # Jev 决策渠道（2026-09-23 郭老师指令配置）：System One 结构化决策
+            # 转发 api.typesafe.ai/v1/systemone。请求体：{state, questions:{id:{type,instructions,criteria?/levels?}}, model?}
+            # 三原语：choice(选项+概率+置信)/score(评分)/noul(真伪概率)。key=data/typesafe_key.txt
+            try:
+                data = json.loads(body.decode("utf-8-sig") or "{}")
+            except Exception:  # noqa: BLE001
+                self._send_json(400, {"error": "请求体不是合法 JSON"})
+                return
+            if not (data.get("state") and data.get("questions")):
+                self._send_json(400, {"error": "state 与 questions 必填（questions 例："
+                                              "{\"urgency\":{\"type\":\"noul\",\"instructions\":\"...\"}}）"})
+                return
+            data.setdefault("model", "jev-latest")
+            jev_key = _jev_key()
+            if not jev_key:
+                self._send_json(400, {"error": "typesafe key 未配置（data/typesafe_key.txt）"})
+                return
+            jreq = urllib.request.Request(
+                "https://api.typesafe.ai/v1/systemone",
+                data=json.dumps(data, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json",
+                         "Authorization": "Bearer " + jev_key}, method="POST")
+            try:
+                with urllib.request.urlopen(jreq, timeout=60) as resp:
+                    raw = resp.read()
+                self._send_json(200, json.loads(raw.decode("utf-8")))
+            except urllib.error.HTTPError as e:
+                detail = e.read().decode("utf-8", "ignore")[:300]
+                self._send_json(e.code, {"error": "Jev 上游 %d: %s" % (e.code, detail)})
+            except Exception as e:  # noqa: BLE001
+                self._send_json(502, {"error": "Jev 上游不可达：%s" % str(e)[:150]})
+            return
         if path == "/api/probes/run":
             try:
                 import probe_reducer
@@ -2307,6 +2340,24 @@ _OPS_TASKS = ("BalanceWatch", "ArkQuotaScan", "ChannelDailyRefresh",
 _OPS_SVCS = ("ai-gateway-3100", "web2api-3102")
 
 
+# ---------------------------------------------------------------- Jev 决策渠道（2026-09-23）
+_JEV_KEY = {"v": None}
+
+
+def _jev_key():
+    """TypeSafe key（data/typesafe_key.txt，gitignore），带缓存。"""
+    if _JEV_KEY["v"]:
+        return _JEV_KEY["v"]
+    try:
+        p = os.path.join(channels.DATA_DIR, "typesafe_key.txt")
+        v = open(p, encoding="utf-8-sig").read().strip()
+        if v:
+            _JEV_KEY["v"] = v
+        return v or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _ops_status():
     now = time.time()
     if _OPS_CACHE["data"] is not None and now - _OPS_CACHE["t"] < 45:
@@ -2350,6 +2401,9 @@ def _ops_status():
             out["web2api"] = json.loads(resp.read().decode("utf-8"))
     except Exception as exc:  # noqa: BLE001
         out["web2api"] = {"status": "unreachable", "error": str(exc)}
+    # 3.5 Jev 决策渠道状态
+    out["jev"] = {"endpoint": "/v1/jev", "model": "jev-latest",
+                  "key_configured": bool(_jev_key())}
     # 4) 渠道警报尾行
     try:
         p = os.path.join(channels.DATA_DIR, "渠道警报.log")
