@@ -1767,6 +1767,10 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/resource-config/status":
             # P4.2：资源配置热加载状态（发布方 ACK 轮询 + 排障用，免鉴权只读）
             self._send_json(200, _resource_status())
+        elif path == "/api/ops":
+            # 系统运维聚合（2026-09-23：前端单面板）——NSSM 服务/定时任务/web2api
+            # 适配器健康/渠道警报尾行/余额台账。45s 缓存，只读无密钥。
+            self._send_json(200, _ops_status())
         elif path == "/api/health":
             self._send_json(200, {"llm": channels.cached_health_all(),
                                   "hidden": channels.hidden_channels_meta(),
@@ -2287,6 +2291,84 @@ def _read_page(name="api_page.html"):
             return f.read()
     except Exception:  # noqa: BLE001
         return "<html><body><h2>" + name + " 缺失</h2></body></html>"
+
+
+# ---------------------------------------------------------------- 系统运维聚合（2026-09-23）
+_OPS_CACHE = {"t": 0.0, "data": None}
+_OPS_TASKS = ("BalanceWatch", "ArkQuotaScan", "ChannelDailyRefresh",
+              "BaiWelfareCheck", "ZenMuxFreeScan")
+_OPS_SVCS = ("ai-gateway-3100", "web2api-3102")
+
+
+def _ops_status():
+    now = time.time()
+    if _OPS_CACHE["data"] is not None and now - _OPS_CACHE["t"] < 45:
+        return _OPS_CACHE["data"]
+    import subprocess as _sp
+    out = {"services": [], "tasks": [], "web2api": None, "alerts": [], "balances": [],
+           "generated": time.strftime("%Y-%m-%d %H:%M:%S")}
+    # 1) NSSM 服务状态
+    for svc in _OPS_SVCS:
+        try:
+            r = _sp.run(["sc.exe", "query", svc], capture_output=True, text=True,
+                        timeout=6, creationflags=0x08000000)
+            state = "UNKNOWN"
+            for ln in (r.stdout or "").splitlines():
+                s = ln.strip()
+                if s.startswith("STATE") or "状态" in s:
+                    state = s.split()[-1] if "RUNNING" in s or "STOPPED" in s else s
+                    break
+            out["services"].append({"name": svc, "state": state})
+        except Exception as exc:  # noqa: BLE001
+            out["services"].append({"name": svc, "state": "ERR: %s" % exc})
+    # 2) 定时任务（下次运行 + 状态）
+    try:
+        r = _sp.run(["schtasks", "/query", "/fo", "csv", "/nh"], capture_output=True,
+                    text=True, timeout=20, encoding="gbk", errors="replace",
+                    creationflags=0x08000000)
+        import csv as _csv
+        for row in _csv.reader((r.stdout or "").splitlines()):
+            if not row:
+                continue
+            name = (row[0] or "").strip().strip('"').split("\\")[-1]
+            if name in _OPS_TASKS:
+                out["tasks"].append({"name": name,
+                                     "next": (row[1] if len(row) > 1 else "").strip(),
+                                     "status": (row[2] if len(row) > 2 else "").strip()})
+    except Exception as exc:  # noqa: BLE001
+        out["tasks"] = [{"name": "ERR", "next": "", "status": str(exc)}]
+    # 3) web2api 适配器健康
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:3102/health", timeout=3) as resp:
+            out["web2api"] = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        out["web2api"] = {"status": "unreachable", "error": str(exc)}
+    # 4) 渠道警报尾行
+    try:
+        p = os.path.join(channels.DATA_DIR, "渠道警报.log")
+        if os.path.exists(p):
+            with open(p, encoding="utf-8", errors="replace") as f:
+                out["alerts"] = [l.rstrip() for l in f.readlines()[-12:]]
+    except Exception as exc:  # noqa: BLE001
+        out["alerts"] = ["read error: %s" % exc]
+    # 5) 余额台账（quota_guard.json 有 balance 的渠道）
+    try:
+        gpath = os.path.join(channels.DATA_DIR, "quota_guard.json")
+        g = json.load(open(gpath, encoding="utf-8-sig"))
+        for cid, ch in (g.get("channels") or {}).items():
+            b = ch.get("balance")
+            if not b:
+                continue
+            out["balances"].append({
+                "channel": cid,
+                "remaining": b.get("remaining"), "total": b.get("total"),
+                "currency": b.get("currency", "CNY"),
+                "monitor_only": bool(b.get("monitor_only")),
+                "source": b.get("source", "")})
+    except Exception as exc:  # noqa: BLE001
+        out["balances"] = [{"channel": "ERR", "remaining": str(exc)}]
+    _OPS_CACHE["t"], _OPS_CACHE["data"] = now, out
+    return out
 
 
 def _speed_test_data():

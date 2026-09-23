@@ -1253,6 +1253,20 @@ body{position:relative}
 .modal-field input:focus,.modal-field select:focus{border-color:var(--ink)}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
 .key-reveal-box{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:var(--r-xs);padding:14px;margin:16px 0;word-break:break-all;font-family:var(--font-mono);font-size:13px;color:var(--ink);user-select:all}
+
+/* 2026-09-23 系统运维面板（view-ops） */
+.ops-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.ops-card{background:var(--paper,#faf9f5);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 20px}
+:root[data-theme="dark"] .ops-card{background:#141413;border-color:rgba(255,255,255,.1)}
+.ops-card .section-head{padding:0 0 10px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.ops-rows{display:flex;flex-direction:column;gap:8px;font-size:var(--text-xs)}
+.ops-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ops-row .k{color:var(--muted)}
+.ops-row .v{font-family:var(--font-mono);font-weight:600;color:var(--ink);text-align:right}
+.ops-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.ops-dot.ok{background:#10b981}.ops-dot.bad{background:#ef4444}.ops-dot.warn{background:#f59e0b}.ops-dot.idle{background:#9ca3af}
+.ops-alerts{font-family:var(--font-mono);font-size:11px;line-height:1.75;color:var(--ink);white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto;background:rgba(0,0,0,.03);border-radius:var(--r-xs);padding:12px}
+:root[data-theme="dark"] .ops-alerts{background:rgba(255,255,255,.05)}
 </style>
 </head>
 <body>
@@ -1462,6 +1476,19 @@ body{position:relative}
         </div>
       </section>
 
+      <section class="view" id="view-ops" data-view="ops">
+        <div class="view-head"><div><div class="view-kicker" data-i18n="opsKicker">09 / SYSTEM OPERATIONS</div><div class="view-title" data-i18n="opsTitle">System Ops</div><div class="view-sub" data-i18n="opsSub">NSSM services · scheduled tasks · web2api adapters · channel alerts · balance ledger.</div></div></div>
+        <div class="section" style="padding-top:26px">
+          <div class="ops-grid">
+            <div class="ops-card"><div class="section-head"><div class="section-title">NSSM 服务</div><button class="ghost-btn" id="opsRefresh" data-i18n="retry">刷新</button></div><div id="opsServices" class="ops-rows"></div></div>
+            <div class="ops-card"><div class="section-head"><div class="section-title">定时任务</div></div><div id="opsTasks" class="ops-rows"></div></div>
+            <div class="ops-card"><div class="section-head"><div class="section-title">web2api 网页桥适配器</div></div><div id="opsWeb2api" class="ops-rows"></div></div>
+            <div class="ops-card"><div class="section-head"><div class="section-title">余额台账</div></div><div id="opsBalances" class="ops-rows"></div></div>
+          </div>
+          <div class="ops-card" style="margin-top:18px"><div class="section-head"><div class="section-title">渠道警报（最近 12 条）</div></div><pre id="opsAlerts" class="ops-alerts">…</pre></div>
+        </div>
+      </section>
+
       <section class="view" id="view-settings" data-view="settings">
         <div class="view-head"><div><div class="view-kicker">07 / Local console preferences</div><div class="view-title" data-i18n="settingsTitle">Settings</div><div class="view-sub" data-i18n="settingsSub">沿用 <span class="mono">data-theme</span> + <span class="mono">data-style</span> + <span class="mono">gw-accent</span> + localStorage。黑白建筑极简对应 style: <span class="mono">architect</span>。</div></div></div>
         <div class="settings-grid section">
@@ -1501,7 +1528,7 @@ body{position:relative}
 (function(){'use strict';
 const NAV=[
   ['dashboard','Dashboard','home'],['catalog','Model Catalog','cube'],['routes','Route Management','route'],['channels','Channel Registry','database'],
-  ['modeltest','Model Test','test'],['logs','Logs & Traces','logs'],['analytics','Analytics','chart'],['probes','Probes','probe'],['settings','Settings','settings']
+  ['modeltest','Model Test','test'],['logs','Logs & Traces','logs'],['analytics','Analytics','chart'],['probes','Probes','probe'],['ops','System Ops','ops'],['settings','Settings','settings']
 ];
 const ICONS={
   key:'<svg viewBox="0 0 24 24"><path d="m15.5 8.5 2 2M13.5 10.5 17 7l2 2 2-2-3.5-3.5a5 5 0 1 0-7 7l-7 7v4h4l2-2v-2l2-2v-2l1.5-1.5z"></path><circle cx="6.5" cy="6.5" r="1.5"></circle></svg>',
@@ -1513,13 +1540,14 @@ const ICONS={
   logs:'<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1"></rect><path d="M8 8h8M8 12h8M8 16h5"></path></svg>',
   chart:'<svg viewBox="0 0 24 24"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2"></path></svg>',
   probe:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"></path></svg>',
+  ops:'<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 5.6L3 17.6V21h3.4l5.7-5.7a4.5 4.5 0 0 0 5.6-6l-3 3-2.4-.6-.6-2.4z"></path></svg>',
   settings:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6l-.3-2.6h-4L10.5 6A7 7 0 0 0 9 7.1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2L4.6 14.5l2 3.4 2.4-1A7 7 0 0 0 10.5 18l.2 2.6h4L15 18a7 7 0 0 0 1.5-1.1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z"></path></svg>'
 };
 let LANG=(function(){try{return localStorage.getItem('gw-lang')||((navigator.language||'').toLowerCase().indexOf('zh')===0?'zh':'en')}catch(e){return 'en'}})();
 const I18N={
 zh:{
  docTitle:'API 转发网关',
-  nav_dashboard:'总览',nav_catalog:'模型目录',nav_routes:'路由管理',nav_channels:'渠道注册表',cacheTitle:'两级语义缓存',cacheActive:'活跃词条',cacheHits:'极速命中',purgeCache:'清空缓存',probesRun:'⚡ 重新跑分评测',probesRank70:'🏆 优质榜 (70+)',nav_logs:'日志与追踪',nav_analytics:'用量分析',nav_probes:'模型实测大盘',nav_settings:'设置',nav_modeltest:'渠道模型测试',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'模型实测大盘',probesSub:'全网 577+ 款上游大模型实测链路观测台：综合质量评分、吞吐速度 (tok/s)、首字响应延迟 (TTFT) 与计费模式台账。',probesSearchPh:'搜索模型名、系列或所属渠道（如 qwen2.5, claude, groq）…',mtTitle:'渠道模型测试',mtSub:'选择模型，真实发起一次对话补全，验证该模型当前能否跑通。',mtModel:'模型',mtPrompt:'提示词',mtRun:'运行测试',mtRunning:'测试运行中…',mtResultT:'测试结果',mtStatus:'状态',mtOk:'成功',mtFail:'失败',mtLatency:'耗时',mtUsage:'用量',mtIdle:'尚未运行测试',mtIdleHint:'在左侧确认渠道与模型、填好提示词，点「运行测试」，结果会显示在这里。',mtPlanIdle:'选择模型后自动加载候选链。',mtSetupT:'测试参数',mtPlanT:'当前路由计划（排障）',mtNote:'每次测试真实调用一次对话补全（max_tokens 1024），计入渠道用量。',mtSearchPh:'搜索模型（仅启用渠道的模型）…',mtScopeNote:'个启用渠道的模型并集',mtScopeFallback:'全量目录（未取得启用渠道列表）',mtChannelT:'渠道筛选',mtAllCh:'全部启用渠道',mtFrom:'来源渠道：',mtPaidWarn:'⚠ 为什么出现这条：该模型有渠道会按量扣费（如 opencode / tokenrhythm 等）。你点「运行测试」只发一次请求，网关会从候选链里选一个可用渠道执行——如果落到付费渠道就会扣费（max_tokens 1024 单次约几分钱以内）。想避免扣费：切到「多渠道并测」只勾免费渠道，或在「单渠道单测」里锁定一个免费渠道。',mtFreeNote:'该模型在所有可用渠道均为免费/赠送额度，本次测试不会扣费。',mtUnknownWarn:'⚠ 为什么出现这条：这些渠道是免费渠道（如 NVIDIA NIM、openrouter），但没提供「该模型免费」的模型级白名单，本页无法向你保证不扣费。确认办法：切到「多渠道并测」看勾选列表，或在「单渠道单测」锁定 NVIDIA NIM（其免费档全模型免费）。',mtNoMatch:'无匹配模型',mtMode:'测试模式',mtModeSingle:'单渠道单测',mtModeMulti:'多渠道并测',mtModeSingleHint:'锁定一个渠道，只测这一个（绕过回落链）。选「全部启用渠道」时由网关自行回落。',mtModeMultiHint:'同一模型在多个渠道并发测试，便于横向对比速度与可用性。默认只勾免费渠道，付费渠道需手动勾选。',mtTargetsT:'并测渠道',mtFreeCount:'个免费',mtNoTarget:'该模型暂无可测渠道',mtRunHintMulti:'并发调用所选渠道 · max_tokens 1024',mtRunningMulti:'正在并发测试 {n} 个渠道…',mtMultiSum:'汇总',mtOkN:'成功',mtTotal:'总耗时',
+  nav_dashboard:'总览',nav_catalog:'模型目录',nav_routes:'路由管理',nav_channels:'渠道注册表',cacheTitle:'两级语义缓存',cacheActive:'活跃词条',cacheHits:'极速命中',purgeCache:'清空缓存',probesRun:'⚡ 重新跑分评测',probesRank70:'🏆 优质榜 (70+)',nav_logs:'日志与追踪',nav_analytics:'用量分析',<nav_probes:'模型实测大盘',nav_settings:'设置',nav_modeltest:'渠道模型测试',nav_ops:'系统运维',opsKicker:'09 / SYSTEM OPERATIONS',opsTitle:'系统运维',opsSub:'NSSM 服务 · 定时任务 · 网页桥适配器 · 渠道警报 · 余额台账 —— 一个面板管全部。',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'模型实测大盘',probesSub:'全网 577+ 款上游大模型实测链路观测台：综合质量评分、吞吐速度 (tok/s)、首字响应延迟 (TTFT) 与计费模式台账。',probesSearchPh:'搜索模型名、系列或所属渠道（如 qwen2.5, claude, groq）…',mtTitle:'渠道模型测试',mtSub:'选择模型，真实发起一次对话补全，验证该模型当前能否跑通。',mtModel:'模型',mtPrompt:'提示词',mtRun:'运行测试',mtRunning:'测试运行中…',mtResultT:'测试结果',mtStatus:'状态',mtOk:'成功',mtFail:'失败',mtLatency:'耗时',mtUsage:'用量',mtIdle:'尚未运行测试',mtIdleHint:'在左侧确认渠道与模型、填好提示词，点「运行测试」，结果会显示在这里。',mtPlanIdle:'选择模型后自动加载候选链。',mtSetupT:'测试参数',mtPlanT:'当前路由计划（排障）',mtNote:'每次测试真实调用一次对话补全（max_tokens 1024），计入渠道用量。',mtSearchPh:'搜索模型（仅启用渠道的模型）…',mtScopeNote:'个启用渠道的模型并集',mtScopeFallback:'全量目录（未取得启用渠道列表）',mtChannelT:'渠道筛选',mtAllCh:'全部启用渠道',mtFrom:'来源渠道：',mtPaidWarn:'⚠ 为什么出现这条：该模型有渠道会按量扣费（如 opencode / tokenrhythm 等）。你点「运行测试」只发一次请求，网关会从候选链里选一个可用渠道执行——如果落到付费渠道就会扣费（max_tokens 1024 单次约几分钱以内）。想避免扣费：切到「多渠道并测」只勾免费渠道，或在「单渠道单测」里锁定一个免费渠道。',mtFreeNote:'该模型在所有可用渠道均为免费/赠送额度，本次测试不会扣费。',mtUnknownWarn:'⚠ 为什么出现这条：这些渠道是免费渠道（如 NVIDIA NIM、openrouter），但没提供「该模型免费」的模型级白名单，本页无法向你保证不扣费。确认办法：切到「多渠道并测」看勾选列表，或在「单渠道单测」锁定 NVIDIA NIM（其免费档全模型免费）。',mtNoMatch:'无匹配模型',mtMode:'测试模式',mtModeSingle:'单渠道单测',mtModeMulti:'多渠道并测',mtModeSingleHint:'锁定一个渠道，只测这一个（绕过回落链）。选「全部启用渠道」时由网关自行回落。',mtModeMultiHint:'同一模型在多个渠道并发测试，便于横向对比速度与可用性。默认只勾免费渠道，付费渠道需手动勾选。',mtTargetsT:'并测渠道',mtFreeCount:'个免费',mtNoTarget:'该模型暂无可测渠道',mtRunHintMulti:'并发调用所选渠道 · max_tokens 1024',mtRunningMulti:'正在并发测试 {n} 个渠道…',mtMultiSum:'汇总',mtOkN:'成功',mtTotal:'总耗时',
  brandSub:'统一连接 · 智行无界',connInitial:'观测 API',connLive:'观测在线',connAuth:'需要鉴权',connOffline:'观测离线',
  authBanner:'观测 API 需要鉴权',setCred:'设置凭据',greetHint:'点击切换显示实时时间',searchPh:'搜索模型、渠道、路由…',retry:'重试',
  offlineProtected:'观测 API 受保护。请在设置中添加观测凭据。',offlineUnavail:'观测 API 不可达：',
@@ -1576,7 +1604,7 @@ zh:{
 },
 en:{
  docTitle:'API Gateway',
-  nav_dashboard:'Dashboard',nav_catalog:'Model Catalog',nav_routes:'Route Management',nav_channels:'Channel Registry',cacheTitle:'Semantic Cache',cacheActive:'Active Entries',cacheHits:'Total Hits',purgeCache:'Purge Cache',probesRun:'⚡ Re-run Benchmarks',probesRank70:'🏆 Tier A (70+)',nav_logs:'Logs & Traces',nav_analytics:'Analytics',nav_probes:'Model Benchmarks',nav_settings:'Settings',nav_modeltest:'Model Test',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'Model Benchmarks',probesSub:'Measured model benchmark facts: quality scores (0-100), throughput (tok/s), TTFT latency, and billing telemetry across 577+ models.',probesSearchPh:'Search model, series, or channel (e.g. qwen2.5, claude, groq)…',mtTitle:'Model Test',mtSub:'Pick a model and fire one real chat completion to verify it can run right now.',mtModel:'Model',mtPrompt:'Prompt',mtRun:'Run test',mtRunning:'Running…',mtResultT:'Test result',mtStatus:'Status',mtOk:'OK',mtFail:'FAIL',mtLatency:'Latency',mtUsage:'Usage',mtIdle:'No test run yet',mtIdleHint:'Confirm channel and model on the left, write a prompt, then hit Run. Results appear here.',mtPlanIdle:'Pick a model to load its candidate chain.',mtSetupT:'Test setup',mtPlanT:'Route plan (debug)',mtNote:'Each test fires one real chat completion (max_tokens 1024) and counts toward channel usage.',mtSearchPh:'Search models (enabled channels only)…',mtScopeNote:'models from enabled channels',mtScopeFallback:'full catalog (enabled channel list unavailable)',mtChannelT:'Channel',mtAllCh:'All enabled channels',mtFrom:'Source channels: ',mtPaidWarn:'Why this shows: some channels for this model bill per token (e.g. opencode / tokenrhythm). Run fires ONE request and the gateway picks the first available candidate — if it lands on a paid channel you will be billed (~a small fraction of a cent at max_tokens 1024). To avoid billing: switch to Multi-channel and tick only free ones, or pin a free channel in Single mode.',mtFreeNote:'All source channels are free / free-quota. This test will not be billed.',mtUnknownWarn:'This model sits on a channel with no model-level free whitelist, so billing cannot be confirmed. Verify on the provider page before running.',mtNoMatch:'No matching model',mtMode:'Mode',mtModeSingle:'Single channel',mtModeMulti:'Multi-channel',mtModeSingleHint:'Pin one channel and test only it (bypasses the fallback chain). Pick “All channels” to let the gateway fall back.',mtModeMultiHint:'Fire the same model across several channels concurrently to compare speed and availability. Free channels are pre-selected; paid ones must be ticked manually.',mtTargetsT:'Channels to test',mtFreeCount:'free',mtNoTarget:'No testable channel for this model',mtRunHintMulti:'concurrent calls · max_tokens 1024',mtRunningMulti:'Testing {n} channels concurrently…',mtMultiSum:'Summary',mtOkN:'succeeded',mtTotal:'Total',
+  nav_dashboard:'Dashboard',nav_catalog:'Model Catalog',nav_routes:'Route Management',nav_channels:'Channel Registry',cacheTitle:'Semantic Cache',cacheActive:'Active Entries',cacheHits:'Total Hits',purgeCache:'Purge Cache',probesRun:'⚡ Re-run Benchmarks',probesRank70:'🏆 Tier A (70+)',nav_logs:'Logs & Traces',nav_analytics:'Analytics',nav_probes:'Model Benchmarks',nav_settings:'Settings',nav_modeltest:'Model Test',nav_ops:'System Ops',opsKicker:'09 / SYSTEM OPERATIONS',opsTitle:'System Ops',opsSub:'NSSM services · scheduled tasks · web2api adapters · channel alerts · balance ledger — all in one panel.',probesKicker:'08 / MODEL BENCHMARKS & LEADERBOARD',probesTitle:'Model Benchmarks',probesSub:'Measured model benchmark facts: quality scores (0-100), throughput (tok/s), TTFT latency, and billing telemetry across 577+ models.',probesSearchPh:'Search model, series, or channel (e.g. qwen2.5, claude, groq)…',mtTitle:'Model Test',mtSub:'Pick a model and fire one real chat completion to verify it can run right now.',mtModel:'Model',mtPrompt:'Prompt',mtRun:'Run test',mtRunning:'Running…',mtResultT:'Test result',mtStatus:'Status',mtOk:'OK',mtFail:'FAIL',mtLatency:'Latency',mtUsage:'Usage',mtIdle:'No test run yet',mtIdleHint:'Confirm channel and model on the left, write a prompt, then hit Run. Results appear here.',mtPlanIdle:'Pick a model to load its candidate chain.',mtSetupT:'Test setup',mtPlanT:'Route plan (debug)',mtNote:'Each test fires one real chat completion (max_tokens 1024) and counts toward channel usage.',mtSearchPh:'Search models (enabled channels only)…',mtScopeNote:'models from enabled channels',mtScopeFallback:'full catalog (enabled channel list unavailable)',mtChannelT:'Channel',mtAllCh:'All enabled channels',mtFrom:'Source channels: ',mtPaidWarn:'Why this shows: some channels for this model bill per token (e.g. opencode / tokenrhythm). Run fires ONE request and the gateway picks the first available candidate — if it lands on a paid channel you will be billed (~a small fraction of a cent at max_tokens 1024). To avoid billing: switch to Multi-channel and tick only free ones, or pin a free channel in Single mode.',mtFreeNote:'All source channels are free / free-quota. This test will not be billed.',mtUnknownWarn:'This model sits on a channel with no model-level free whitelist, so billing cannot be confirmed. Verify on the provider page before running.',mtNoMatch:'No matching model',mtMode:'Mode',mtModeSingle:'Single channel',mtModeMulti:'Multi-channel',mtModeSingleHint:'Pin one channel and test only it (bypasses the fallback chain). Pick “All channels” to let the gateway fall back.',mtModeMultiHint:'Fire the same model across several channels concurrently to compare speed and availability. Free channels are pre-selected; paid ones must be ticked manually.',mtTargetsT:'Channels to test',mtFreeCount:'free',mtNoTarget:'No testable channel for this model',mtRunHintMulti:'concurrent calls · max_tokens 1024',mtRunningMulti:'Testing {n} channels concurrently…',mtMultiSum:'Summary',mtOkN:'succeeded',mtTotal:'Total',
  brandSub:'统一连接 · 智行无界',connInitial:'观测 API',connLive:'观测在线',connAuth:'需要鉴权',connOffline:'观测离线',
  authBanner:'观测 API 需要鉴权',setCred:'设置凭据',greetHint:'点击切换显示实时时间',searchPh:'搜索模型、渠道、路由…',retry:'重试',
  offlineProtected:'观测 API 受保护。请在设置中添加观测凭据。',offlineUnavail:'观测 API 不可达：',
@@ -1734,7 +1762,41 @@ function renderNav(){
 }
 function navigate(view){if(!NAV.some(n=>n[0]===view))view='dashboard';location.hash='#/'+view}
 function routeFromHash(){const v=(location.hash||'#/dashboard').replace(/^#\//,'').split(/[/?]/)[0];return NAV.some(n=>n[0]===v)?v:'dashboard'}
-function renderRoute(){state.active=routeFromHash();$$('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===state.active));$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.nav===state.active));if(state.active==='dashboard')renderDashboard();if(state.active==='catalog')renderCatalog();if(state.active==='routes'){renderRoutes();renderTierMap()}if(state.active==='channels')renderChannels();if(state.active==='logs')renderLogs();if(state.active==='analytics')renderAnalytics();if(state.active==='probes')renderProbes();if(state.active==='settings')renderSettings();if(state.active==='modeltest')renderModelTest();}
+function renderRoute(){state.active=routeFromHash();$$('.view').forEach(v=>v.classList.toggle('active',v.dataset.view===state.active));$$('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.nav===state.active));if(state.active==='dashboard')renderDashboard();if(state.active==='catalog')renderCatalog();if(state.active==='routes'){renderRoutes();renderTierMap()}if(state.active==='channels')renderChannels();if(state.active==='logs')renderLogs();if(state.active==='analytics')renderAnalytics();if(state.active==='probes')renderProbes();if(state.active==='settings')renderSettings();if(state.active==='modeltest')renderModelTest();if(state.active==='ops')renderOps()}
+/* 2026-09-23 系统运维面板：/api/ops 聚合（NSSM 服务/定时任务/web2api/余额/警报） */
+let opsTimer=null;
+async function renderOps(){
+  const dot=(cls)=>`<span class="ops-dot ${cls}"></span>`;
+  try{
+    const d=await apiFetch('/api/ops');
+    $('#opsServices').innerHTML=(d.services||[]).map(s=>{
+      const ok=/RUNNING/i.test(s.state);
+      return `<div class="ops-row"><span class="k">${esc(s.name)}</span><span class="v">${dot(ok?'ok':'bad')}${esc(s.state)}</span></div>`;
+    }).join('')||'<div class="ops-row"><span class="k">无</span></div>';
+    $('#opsTasks').innerHTML=(d.tasks||[]).map(t=>{
+      const ok=/ready|就绪/i.test(t.status)&&!/disabled|禁用/i.test(t.status);
+      return `<div class="ops-row"><span class="k">${esc(t.name)}</span><span class="v">${dot(ok?'ok':'warn')}${esc(t.next||t.status||'?')}</span></div>`;
+    }).join('')||'<div class="ops-row"><span class="k">无</span></div>';
+    const w=d.web2api||{};
+    let wh=`<div class="ops-row"><span class="k">服务 :3102</span><span class="v">${dot(w.status==='ok'?'ok':'bad')}${esc(w.status||'?')}</span></div>`;
+    const ads=w.adapters||{};
+    for(const k in ads){
+      const a=ads[k];
+      const st=a.page_ready?(a.login===false?'no-login':'ready'):'page-missing';
+      wh+=`<div class="ops-row"><span class="k">${esc(k)}</span><span class="v">${dot(st==='ready'?'ok':(st==='page-missing'?'warn':'idle'))}${esc(st)}</span></div>`;
+    }
+    $('#opsWeb2api').innerHTML=wh;
+    $('#opsBalances').innerHTML=(d.balances||[]).map(b=>{
+      const pct=(b.total&&b.remaining!=null)?(b.remaining/b.total*100):null;
+      const cls=pct==null?'idle':(pct<=20?'bad':(pct<=40?'warn':'ok'));
+      return `<div class="ops-row"><span class="k">${esc(b.channel)}</span><span class="v">${dot(cls)}${b.remaining!=null?b.remaining:'?'}${b.total?` / ${b.total}`:''} ${esc(b.currency||'')}</span></div>`;
+    }).join('')||'<div class="ops-row"><span class="k">无</span></div>';
+    $('#opsAlerts').textContent=(d.alerts&&d.alerts.length)?d.alerts.join('\n'):'（暂无警报）';
+  }catch(e){
+    ['#opsServices','#opsTasks','#opsWeb2api','#opsBalances'].forEach(s=>{const el=$(s);if(el)el.innerHTML=`<div class="ops-row"><span class="k">加载失败</span><span class="v">${esc(String(e.message||e).slice(0,60))}</span></div>`});
+  }
+  clearTimeout(opsTimer);opsTimer=setTimeout(()=>{if(state.active==='ops')renderOps()},30000);
+}
 /* 2026-09-18: 目录与路由已对齐清空。aliases() 仍取两者并集（重建时目录先于路由落地，
    必须让"只有目录、还没配路由"的别名也能出现在编排页，否则新建的别名看不到）。
    页面在并集为空时走空状态分支，不再渲染空列表。 */
