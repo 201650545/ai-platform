@@ -787,6 +787,7 @@ def route_completion(payload, tenant=None):
             # 2026-09-18: 剔除测试专用参数，避免透传给上游造成 400
             p2.pop("_pin_channel", None)
             p2.pop("pin_channel", None)
+            p2 = _sanitize_upstream_messages(p2)  # 2026-09-23: 消毒 reasoning_details/数组 content
             log_entry["resolved_channel"] = cid
             log_entry["resolved_model"] = real_model
             log_entry["resolved_class"] = (pricing.peek_class(cid, real_model) or {}).get("class")
@@ -2375,6 +2376,41 @@ def _ops_status():
         out["balances"] = [{"channel": "ERR", "remaining": str(exc)}]
     _OPS_CACHE["t"], _OPS_CACHE["data"] = now, out
     return out
+
+
+def _sanitize_upstream_messages(payload):
+    """上游请求消毒（2026-09-23）：DSH/推理型客户端回放对话时带 reasoning_details、
+    content 为多模态数组，严格上游（groq/cloudflare 等）直接 400 拒收：
+    - groq: "property 'reasoning_details' is unsupported"
+    - cloudflare: "Type mismatch of '/messages/0/content', 'array' not in 'string'"
+    规则：①所有消息剥 reasoning_details；②content 为数组且全是 text 段 → 拍平成
+    字符串；③含图片段的数组保留（视觉渠道需要）。"""
+    msgs = payload.get("messages")
+    if not isinstance(msgs, list):
+        return payload
+    cleaned = []
+    changed = False
+    for m in msgs:
+        if not isinstance(m, dict):
+            cleaned.append(m)
+            continue
+        m2 = m
+        if "reasoning_details" in m2:
+            m2 = {k: v for k, v in m2.items() if k != "reasoning_details"}
+            changed = True
+        c = m2.get("content")
+        if isinstance(c, list) and c and all(
+                isinstance(p, dict) and p.get("type") == "text" and isinstance(p.get("text"), str)
+                for p in c):
+            m2 = dict(m2)
+            m2["content"] = "".join(p["text"] for p in c)
+            changed = True
+        cleaned.append(m2)
+    if not changed:
+        return payload
+    p2 = dict(payload)
+    p2["messages"] = cleaned
+    return p2
 
 
 def _speed_test_data():
