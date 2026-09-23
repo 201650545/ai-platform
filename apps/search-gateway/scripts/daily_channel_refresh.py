@@ -47,6 +47,15 @@ def log_alert(msg):
 
 
 def probe_settled():
+    # 连续失败追踪（2026-09-23 郭老师指令「渠道死了必须报」）：任一成员连续 2 晚
+    # 实测失败 → 渠道警报.log（第 1 晚只记 state 不报警，防瞬时 429 误报）。
+    state_path = os.path.join(DATA, "daily_probe_state.json")
+    state = {}
+    if os.path.exists(state_path):
+        try:
+            state = json.load(open(state_path, encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            state = {}
     results = []
     for cid, model in settled_members():
         r = pfc.probe_access(cid, model)
@@ -57,9 +66,18 @@ def probe_settled():
                                writer="daily_channel_refresh")
         results.append((cid, model, ok))
         print(f"[probe] {cid}/{model}: {'OK' if ok else 'FAIL ' + str(r.get('error') or r.get('status'))[:80]}")
+        key = f"{cid}|{model}"
+        streak = 0 if ok else state.get(key, {}).get("streak", 0) + 1
+        state[key] = {"streak": streak, "last": NOW,
+                      "err": str(r.get('error') or r.get('status'))[:80]}
+        if streak >= 2:
+            log_alert(f"编排成员连续 {streak} 天实测失败：{cid}/{model}"
+                      f"（{state[key]['err']}）——请检查渠道/模型是否下架，是否移出编排待拍板")
+            print("!!! 渠道警报已写入:", ALERT_LOG)
         if (cid, model) == ("zscc", "deepseek-v4.1-flash-cc") and not ok:
             log_alert(f"ZSCC V4.1-cc 实测失败（http={r.get('status')}）——郭老师规则：须提醒拍板，勿自行替换！")
             print("!!! 渠道警报已写入:", ALERT_LOG)
+    json.dump(state, open(state_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return results
 
 

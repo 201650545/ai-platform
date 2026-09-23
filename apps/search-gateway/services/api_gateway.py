@@ -1241,6 +1241,12 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             return True
         import tenants
         auth_hdr = self.headers.get("Authorization") or ""
+        if not auth_hdr.strip():
+            # 2026-09-23：Anthropic 系客户端（cc-switch/Claude Code）拉模型列表用
+            # x-api-key 头而非 Bearer——补鉴权兼容，否则 /v1/models 401 读不到模型。
+            xkey = (self.headers.get("x-api-key") or "").strip()
+            if xkey:
+                auth_hdr = "Bearer " + xkey
         master_key = get_api_key()
         ok, code, err_msg, tenant_info = tenants.authenticate_request(auth_hdr, path, master_key=master_key)
         if ok:
