@@ -30,8 +30,10 @@ ZSCC_PAGE = "https://api.zscc.in/wallet"
 
 
 def ocli(*args, timeout=90):
+    # CREATE_NO_WINDOW：禁止弹 system32 cmd 窗口（2026-09-23 郭老师指令）
     r = subprocess.run([OPENCLI, *args], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=timeout)
+                       encoding="utf-8", errors="replace", timeout=timeout,
+                       creationflags=0x08000000)
     return r.stdout or ""
 
 
