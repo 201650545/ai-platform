@@ -28,17 +28,27 @@
 |---|---|
 | 账号卡 Plus | `.n-card span`，innerText 首 "GPT-5"，绿色点=活跃 |
 | 弹窗拦截破法 | 劫持 `window.open` 存 `__openUrl` → 点 span → `location.href = __openUrl` |
-| 模型 pill | `button.__composer-pill`（文本 Auto→Extended） |
-| Extended 菜单项 | `[role=menuitemradio]` → "Auto" / "Thinking• Extended" / "GPT-5.6 Luna" |
+| 模型 pill | `button.__composer-pill`（文本 Auto→**Thinking**）**⚠️ 2026-09-15 起菜单文案已变** |
+| 思考菜单项 | `[role=menuitemradio]` → "Auto" / **"Thinking• Standard"** / "GPT-5.6 Luna" / "Configure..."。**已无 "Thinking• Extended"**；选中后 pill 文本＝**"Thinking"**（非 Extended），故 B 脚本的 `=== 'Extended'` 判定会误判 |
 | 发送 | `[data-testid=send-button]` |
 | 停止（流式中） | `[data-testid=stop-button]` |
-| 回答 | `[data-message-author-role=assistant]` 最后一条 |
-| composer（历史对话页） | **contenteditable**（`wcDTda_fallbackTextarea` 是 0×0，别注进去）→ 优先 fill，失败 focus+`execCommand('insertText')` |
+| 回答 | `[data-message-author-role=assistant]` 最后一条（**图片类任务 asstN 常为 0，只出图不出字，属正常**） |
+| composer（历史对话页） | **contenteditable**（`wcDTda_fallbackTextarea` 是 0×0，别注进去）→ **⚠️ `fill` 对多段中文只填第一段（实测 814 字符只进 112）**，大段文本必须用 base64+`atob`+`execCommand('insertText')` |
 | 新对话页 composer | textarea（placeholder "Ask anything"）→ 原生 value setter + input 事件 |
+
+### 三·六、Windows 传参三大坑（2026-09-15 实测，必读）
+
+`opencli.cmd` 是**批处理**，命令串会再过一遍 cmd 解析，因此：
+
+1. **多行 JS 传参会炸**（`SyntaxError: Unexpected token ')'`）→ 必须 `tr -d '\n'` 压成单行，或写入临时文件后读成单行字符串再传。
+2. **JS 字符串里带 `&` 会炸**（`'fn' is not recognized`，URL 的 `&fn=&cd=&ts=&sig=` 被 cmd 当命令分隔）→ **URL 先 base64 编码，在 JS 里 `atob`+`decodeURIComponent(escape())` 还原**；Python 侧用 `subprocess.run(..., shell=False)`。
+3. **大文件取回**：`fetch → arrayBuffer → window.__buf` 存住，再**按 30000 字节分块**（3 的倍数，规避 base64 跨块填充）逐段取回、逐段 `b64decode` 落盘。**整段拼接 base64 会报 `Incorrect padding`**。可复用脚本：`D:\Work\课程思政教学竞赛\6-上课要用的素材\课件和教具\opencli_scripts\_dl_theme2.py`。
 
 ## 三·五 固化一键脚本法（2026-09-04 实测，零→Extended ≤15s）
 
 > 用两段固化脚本替代逐段手点，快 5–6 倍（74s→9.6s）。脚本在 `docs/runbooks/scripts/evalA_jump.js` 与 `evalB_ext.js`，直接 `opencli browser n8hh7hyn eval "$(cat <脚本>)"`。不复探。
+>
+> **⚠️ 2026-09-19 失效标注**：`evalB_ext.js`（改于 2026-09-06）的三处硬编码断言在 2026-09-15 文案改版后已全部断裂（详见 §三 两处 ⚠️ 与脚本头部注释），**会返回假信号**：`err:'pill-not-ready'`、菜单空转、或切档成功却报 `ok:false`。替代方案 = 契约化自适应版 `D:\Work\自适应工作流引擎\runners\evalB_ext_adaptive.js`（A2 阶段落地）。在替代版就位前，**不要只凭本脚本返回值决定是否可发问**——按 §四·五 第 4 条，发问前必须直接核对顶部 pill 实际文案。
 
 ```
 opencli browser n8hh7hyn tab new "https://ai.wendabao-f.net/?utm_source=hidden-ncn"   # 新标签
