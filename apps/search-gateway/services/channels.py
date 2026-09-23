@@ -72,6 +72,7 @@ CHANNELS = {
         "icon": "/img/brand/openrouter.png",
         "base_url": "https://openrouter.ai/api/v1",
         "env_key": "OPENROUTER_API_KEY",
+        "proxy": "http://127.0.0.1:7890",
         "free": True,
         
         "speed": "medium",
@@ -87,12 +88,13 @@ CHANNELS = {
         "icon": "/img/brand/groq.png",
         "base_url": "https://api.groq.com/openai/v1",
         "env_key": "",
+        "proxy": "http://127.0.0.1:7890",
         "free": True,
-        
+
         "speed": "fast",
         "default_model": "qwen/qwen3.8-27b",
-        "models": ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini", "allam-2-7b"],
-        "note": "LPU 硬件加速，免费配额，0 欠费风险。2026-09-20 按 probe 实测更新：删 catalog 已无的 qwen3.6-27b；补 groq/compound（166 tok/s 最快）、allam-2-7b（110 tok/s）；默认模型换 qwen3.8-27b（101 tok/s、1.1s 总耗时全目录最快响应）。注意：①前置 CF 挡无 User-Agent 请求（403），直连须带 UA；②API 无内置计费字段，免费档限 TPM/RPM 分层。",
+        "models": ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "allam-2-7b"],
+        "note": "LPU 硬件加速，免费配额，0 欠费风险。2026-09-23：①groq/compound 官方下架已删；②加 proxy=7890——直连被墙间歇 SSL 握手超时/403，走 Sparkle 代理后稳定（日志实证 groq timeout x5+handshake x4）。①前置 CF 挡无 UA 请求；②免费档限 TPM/RPM 分层。",
     },
     "siliconflow": {
         "name": "硅基流动 SiliconFlow",
