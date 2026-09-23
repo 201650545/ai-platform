@@ -694,14 +694,22 @@ a{color:inherit}
    nowrap 后表格自然宽于容器 → 包一层 overflow-x:auto，页面不许横向滚。 */
 #view-logs .section{overflow-x:auto;max-width:100%}
 #view-logs{overflow-x:auto;max-width:100%}
-#logTable.log-compact td{padding:5px 12px;white-space:nowrap}
-#logTable.log-compact td code{word-break:normal;white-space:nowrap;font-size:10px}
-#logTable.log-compact .ellipsis{display:block;overflow:hidden;text-overflow:ellipsis;max-width:240px;min-width:80px}
+#logTable.log-compact td,#logTableR.log-compact td{padding:2px 9px;white-space:nowrap;line-height:1.45}
+#logTable.log-compact td code,#logTableR.log-compact td code{word-break:normal;white-space:nowrap;font-size:10px}
+#logTable.log-compact .ellipsis,#logTableR.log-compact .ellipsis{display:block;overflow:hidden;text-overflow:ellipsis;max-width:200px;min-width:70px}
 .log-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
 /* architect 单色纪律：成功=实心墨点，失败=空心描边点（tag.solid/dim 同语法），随主题翻转 */
 .log-dot.ok{background:var(--ink)}
 .log-dot.fail{background:transparent;border:1.5px solid var(--ink)}
-#logTable.log-compact .log-fail-why{color:var(--muted);font-size:9px;margin-left:8px}
+#logTable.log-compact .log-fail-why,#logTableR.log-compact .log-fail-why{color:var(--muted);font-size:9px;margin-left:8px}
+/* 2026-09-23 日志页改版：工具栏+双列布局（试验） */
+.log-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 0}
+.log-toolbar select,.log-toolbar input{height:30px;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:11px;padding:0 8px;border-radius:var(--r-xs);outline:none}
+.log-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 26px;align-items:start}
+.log-cols .data-sheet{width:100%}
+.log-cols .data-sheet td,.log-cols .data-sheet th{padding-left:9px;padding-right:9px}
+@media(max-width:1500px){.log-cols{grid-template-columns:1fr}}
+.log-src-tag{font-size:9px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-right:4px}
 .analytics-summary{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.analytics-stat{padding:20px 18px}.analytics-stat+.analytics-stat{border-left:1px solid var(--line)}.analytics-stat .v{font-size:28px;font-weight:680}.analytics-stat .l{font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:5px}.bar-list{display:flex;flex-direction:column;gap:11px}.bar-row{display:grid;grid-template-columns:120px 1fr 72px;align-items:center;gap:12px}.bar-label{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar-track{height:4px;background:var(--line-2);position:relative}.bar-fill{position:absolute;inset:0 auto 0 0;background:var(--ink);min-width:1px}.bar-value{text-align:right;font-family:var(--font-mono);font-size:9px;color:var(--muted)}
 
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:36px}.settings-block{padding:22px 0;border-top:1px solid var(--line)}.settings-block h3{font-size:13px;margin:0 0 18px}.field{margin-bottom:18px}.field label{display:block;font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}.field input{width:100%;height:38px;border:1px solid var(--line);background:transparent;padding:0 11px;outline:none;font-family:var(--font-mono);font-size:10px}.field input:focus{border-color:var(--ink)}.field-row{display:flex;gap:8px}.field-row input{flex:1}.setting-line{display:flex;justify-content:space-between;gap:20px;padding:11px 0;border-bottom:1px solid var(--line-2);font-size:10px}.setting-line span:first-child{color:var(--muted)}.theme-switch{display:flex;gap:8px}.theme-b{border:1px solid var(--line);background:transparent;padding:8px 11px;font-size:9px}.theme-b.active{background:var(--ink);color:var(--inverse)}
@@ -1371,8 +1379,8 @@ body{position:relative}
       </section>
 
       <section class="view" id="view-logs" data-view="logs">
-        <div class="view-head"><div><div class="view-kicker">04 / Observability</div><div class="view-title" data-i18n="logsTitle">Logs & Traces</div><div class="view-sub" data-i18n="logsSub">直接展示路由日志真实字段：ts / client_model / route_source / attempted / resolved / fallback / errors / failures。</div></div><div class="view-tools"><input class="ghost-btn" id="logFilter" placeholder="Filter logs…" data-i18n-ph="logPh"></div></div>
-        <div class="section" style="overflow:auto"><table class="data-sheet"><thead><tr><th data-i18n="thTime">Time</th><th data-i18n="thClient">Client model</th><th data-i18n="thSource">Source</th><th data-i18n="thAttempted">Attempted</th><th data-i18n="thResolvedCh">Resolved channel</th><th data-i18n="thResolvedModel">Resolved model</th><th data-i18n="thFallback">Fallback</th><th data-i18n="thResult">Result</th></tr></thead><tbody id="logTable"></tbody></table></div>
+        <div class="view-head"><div><div class="view-kicker">04 / Observability</div><div class="view-title" data-i18n="logsTitle">Logs & Traces</div><div class="view-sub" data-i18n="logsSub">直接展示路由日志真实字段：ts / client_model / route_source / attempted / resolved / fallback / errors / failures。</div></div><div class="view-tools log-toolbar"><input class="ghost-btn" id="logFilter" placeholder="搜索模型/渠道/错误…" data-i18n-ph="logPh" style="min-width:170px"><select id="logFResult"><option value="">结果：全部</option><option value="ok">仅成功</option><option value="fail">仅失败</option></select><select id="logFSource"><option value="">来源：全部</option><option value="member_pool">成员池回落</option><option value="explicit_route">手动路由</option><option value="observed">自动选路</option></select><select id="logFTime"><option value="">时段：全部</option><option value="1h">近 1 小时</option><option value="24h">近 24 小时</option></select><span class="tiny" style="color:var(--muted)" id="logCount"></span></div></div>
+        <div class="section" style="overflow:auto"><div class="log-cols"><table class="data-sheet" id="logTable"><thead><tr><th data-i18n="thTime">Time</th><th data-i18n="thClient">Client model</th><th data-i18n="thSource">Source</th><th data-i18n="thAttempted">Attempted</th><th data-i18n="thResolvedCh">Resolved channel</th><th data-i18n="thResolvedModel">Resolved model</th><th data-i18n="thFallback">Fallback</th><th data-i18n="thResult">Result</th></tr></thead><tbody id="logTableL"></tbody></table><table class="data-sheet" id="logTableR"><thead><tr><th data-i18n="thTime">Time</th><th data-i18n="thClient">Client model</th><th data-i18n="thSource">Source</th><th data-i18n="thAttempted">Attempted</th><th data-i18n="thResolvedCh">Resolved channel</th><th data-i18n="thResolvedModel">Resolved model</th><th data-i18n="thFallback">Fallback</th><th data-i18n="thResult">Result</th></tr></thead><tbody id="logTableR2"></tbody></table></div></div>
       </section>
 
       <section class="view" id="view-analytics" data-view="analytics">
@@ -2832,19 +2840,44 @@ function renderChannels(){
   requestAnimationFrame(()=>{const m=document.querySelector('.main');if(m)m.scrollTop=__sy;const g=document.getElementById('channelGrid');if(g&&detCid)g.scrollTop=__gy;});
 }
 function renderRateTable(){const rows=state.rate&&state.rate.channels||{};const ids=Object.keys(rows);$('#rateTable').innerHTML=ids.length?ids.map(cid=>{const v=rows[cid]||{};const day=v.limit_day!=null?`${v.used_day||0}/${v.limit_day} (${v.pct_day==null?'—':v.pct_day+'%'})`:'—';const one=v.limit_rpm!=null?`${v.used_1m||0}/${v.limit_rpm} (${v.pct_1m==null?'—':v.pct_1m+'%'})`:`${v.used_1m||0}/—`;return `<tr><td><code>${esc(cid)}</code></td><td><span class="tag ${v.state==='blocked'?'blocked':v.state==='throttled'?'throttled':''}">${esc(v.state||'open')}</span>${v.blocked_in!=null?`<div class="tiny muted" style="margin-top:4px">${v.blocked_in}${t('remaining')}</div>`:''}</td><td class="mono tiny">${esc(one)}</td><td class="mono tiny">${esc(day)}</td><td class="num">${fmt(v.skipped||0)}</td><td>${esc(v.source||t('srcUnknown'))}</td><td class="tiny muted">${esc(v.note||'—')}</td></tr>`}).join(''):`<tr><td colspan="7" class="muted">${t('rateEmpty')}</td></tr>`}
+function logSrcLabel(s){
+  const map={'member_pool':'成员池','explicit_route':'手动路由','explicit':'手动路由','observed':'自动选路','pinned':'钉定'};
+  return map[s]||(s||'—');
+}
 function renderLogs(){
-  const q=($('#logFilter').value||'').toLowerCase();const logs=state.logs.slice().reverse().filter(e=>!q||JSON.stringify(e).toLowerCase().includes(q));const tb=$('#logTable');tb.classList.add('log-compact');
-  /* 紧凑模式：一行一条、nowrap 省略、状态点、失败原因内联。detail 不再每条预挂
-     一个隐藏 tr（200 条 → 400 tr 全量 DOM），改为点开时才 insertAdjacentHTML 懒建。 */
-  tb.innerHTML=logs.length?logs.map((e,i)=>{
+  const q=($('#logFilter').value||'').toLowerCase();
+  const fRes=$('#logFResult')?$('#logFResult').value:'';
+  const fSrc=$('#logFSource')?$('#logFSource').value:'';
+  const fTime=$('#logFTime')?$('#logFTime').value:'';
+  const nowS=(state.health&&state.health.time?serverSeconds(state.health.time):null)||serverSeconds(new Date().toTimeString().slice(0,8));
+  let logs=state.logs.slice().reverse().filter(e=>{
+    if(q&&!JSON.stringify(e).toLowerCase().includes(q))return false;
+    const ok=!!e.resolved_channel;
+    if(fRes==='ok'&&!ok)return false;
+    if(fRes==='fail'&&ok)return false;
+    if(fSrc){const s=e.route_source||'';if(!s.includes(fSrc))return false;}
+    if(fTime&&nowS!=null){const tS=serverSeconds(e.ts||'');if(tS==null)return false;let d=nowS-tS;if(d<0)d+=86400;
+      if(fTime==='1h'&&d>3600)return false;if(fTime==='24h'&&d>86400)return false;}
+    return true;
+  });
+  const half=Math.ceil(logs.length/2);
+  const L=logs.slice(0,half),R=logs.slice(half);
+  const rowHtml=(e,i)=>{
     const fail=(e.failures||[]).length;const ok=!!e.resolved_channel;
     const attempted=(e.attempted||[]).join('→');
     const why=(e.failures||[]).map(f=>`${f.channel}:${f.outcome||f.detail||''}`).slice(0,2).join(' ');
     const err0=(e.errors||[])[0];
     const whyTxt=why||(err0?String(err0).slice(0,60):'');
-    return `<tr class="log-row" data-log-index="${i}"><td class="mono tiny nowrap"><span class="log-dot ${ok?'ok':'fail'}"></span>${esc(e.ts)}</td><td><code>${esc(e.client_model)}</code></td><td class="tiny">${esc(e.route_source||'—')}</td><td class="tiny"><span class="ellipsis" title="${esc(attempted)}">${esc(attempted||'—')}</span></td><td><code>${esc(e.resolved_channel||'—')}</code></td><td><code>${esc(e.resolved_model||'—')}</code></td><td class="num">${Number(e.fallback_count)||0}</td><td class="tiny"><span class="nowrap">${ok?`<span class="tag solid">${t('tagResolved')}</span>`:`<span class="tag dim">${t('tagFailed')}</span>`}</span>${whyTxt?`<span class="log-fail-why ellipsis" style="max-width:220px;display:inline-block;vertical-align:middle" title="${esc(whyTxt)}">${esc(whyTxt)}</span>`:''}</td></tr>`;
-  }).join(''):`<tr><td colspan="8">${stateBox('030',t('sbNoLogsT'),t('sbNoLogsC'))}</td></tr>`;
-  tb._raw=logs;
+    return `<tr class="log-row" data-log-index="${i}"><td class="mono tiny nowrap"><span class="log-dot ${ok?'ok':'fail'}"></span>${esc(e.ts)}</td><td><code>${esc(e.client_model)}</code></td><td class="tiny"><span class="log-src-tag">${esc(logSrcLabel(e.route_source))}</span></td><td class="tiny"><span class="ellipsis" title="${esc(attempted)}">${esc(attempted||'—')}</span></td><td><code>${esc(e.resolved_channel||'—')}</code></td><td><code>${esc(e.resolved_model||'—')}</code></td><td class="num">${Number(e.fallback_count)||0}</td><td class="tiny"><span class="nowrap">${ok?`<span class="tag solid">${t('tagResolved')}</span>`:`<span class="tag dim">${t('tagFailed')}</span>`}</span>${whyTxt?`<span class="log-fail-why ellipsis" style="max-width:200px;display:inline-block;vertical-align:middle" title="${esc(whyTxt)}">${esc(whyTxt)}</span>`:''}</td></tr>`;
+  };
+  const empty=`<tr><td colspan="8">${stateBox('030',t('sbNoLogsT'),t('sbNoLogsC'))}</td></tr>`;
+  const tbL=$('#logTableL'),tbR=$('#logTableR2');
+  tbL.innerHTML=L.length?L.map((e,i)=>rowHtml(e,i)).join(''):empty;
+  tbR.innerHTML=R.length?R.map((e,i)=>rowHtml(e,half+i)).join(''):'';
+  const lt=$('#logTable'),rt=$('#logTableR');
+  lt.classList.add('log-compact');rt.classList.add('log-compact');
+  lt._raw=logs;rt._raw=logs;
+  const cnt=$('#logCount');if(cnt)cnt.textContent=logs.length+' 条 · 双列试验版';
 }
 function renderAnalytics(){
   const u=totalsToday(),logs=state.logs,success=u.calls?Math.max(0,(u.calls-u.errors)/u.calls*100):0,resolved=logs.filter(e=>e.resolved_channel).length,fb=logs.filter(e=>(Number(e.fallback_count)||0)>0).length;
@@ -3270,7 +3303,7 @@ function bind(){
   document.addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(b){navigate(b.dataset.nav)}const tab=e.target.closest('#channelFilterTabs .filter-tab');if(tab){state.channelFilter=tab.dataset.filter;renderChannels();}});
   $('#langBtn').addEventListener('click',()=>setLang(LANG==='zh'?'en':'zh'));
   $('#greetingTitle').addEventListener('click',toggleGreet);
-  window.addEventListener('hashchange',renderRoute);window.addEventListener('resize',()=>{if(state.active==='dashboard')drawCircuitRails()});$('#dashboardAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'dashboard'));$('#routeAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'routes'));$('#catalogFilter').addEventListener('input',renderCatalog);$('#logFilter').addEventListener('input',renderLogs);$('#globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter')globalSearchAction()});
+  window.addEventListener('hashchange',renderRoute);window.addEventListener('resize',()=>{if(state.active==='dashboard')drawCircuitRails()});$('#dashboardAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'dashboard'));$('#routeAlias').addEventListener('change',e=>setSelectedAlias(e.target.value,'routes'));$('#catalogFilter').addEventListener('input',renderCatalog);$('#logFilter').addEventListener('input',renderLogs);$('#logFResult').addEventListener('change',renderLogs);$('#logFSource').addEventListener('change',renderLogs);$('#logFTime').addEventListener('change',renderLogs);$('#globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter')globalSearchAction()});
   bindProbesEvents();
   $('#refreshBtn').addEventListener('click',()=>loadAll(true));$('#channelsRefresh').addEventListener('click',()=>loadAll(true));$('#offlineRetry').addEventListener('click',()=>loadAll(true));
   $('#themeBtn').addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'));$$('[data-theme-choice]').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.themeChoice)));
