@@ -73,3 +73,10 @@ apps/search-gateway/**/*.bak_*
 .obsidian/cache
 .obsidian/plugins/*/data.json
 .obsidian/plugins/*/main.js
+
+# ---- 2026-09-23 历史瘦身：成品素材不入库（完整副本见 D:\Work\api-gateway\）----
+apps/api-gateway/prototypes/
+apps/api-gateway/v5/
+apps/api-gateway/v5.2-experiment/
+apps/api-gateway/对话记录/
+apps/api-gateway/docs/预览图-*.png
