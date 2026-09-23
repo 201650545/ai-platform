@@ -76,7 +76,7 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "meta-llama/llama-3.3-70b-instruct:free",
+        "default_model": "inclusionai/ling-3.0-flash-sante:free",
         "models": [],  # 启动/健康检查时动态拉取免费模型
         "note": "自动筛选 :free 节点，0 扣费风险。",
     },
@@ -218,7 +218,7 @@ CHANNELS = {
         "free": True,
         
         "speed": "medium",
-        "default_model": "claude-sonnet-5",
+        "default_model": "deepseek-v4.1-flash-cc",
         "models": ["claude-opus-4-8", "claude-sonnet-5", "gpt-5.6-sol"],
         "note": "ZSCC（Cherry Studio 已配置 key；模型清单 2026-08-23 对齐 Cherry Studio，禁测）。",
     },
