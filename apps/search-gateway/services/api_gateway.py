@@ -2208,6 +2208,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             self._send_json(503, {"error": {"message": "API 转发网关已暂停（总开关关闭）",
                                             "type": "gateway_paused"}})
             return
+        _jev_route(payload)  # 2026-09-24: model=auto/free-auto 时 Jev 意图选档
         requested_model = (payload.get("model") or "").strip()
         tenant = getattr(self, "_current_tenant", None)
         if tenant:
@@ -2404,7 +2405,8 @@ def _ops_status():
         out["web2api"] = {"status": "unreachable", "error": str(exc)}
     # 3.5 Jev 决策渠道状态
     out["jev"] = {"endpoint": "/v1/jev", "model": "jev-latest",
-                  "key_configured": bool(_jev_key())}
+                  "key_configured": bool(_jev_key()),
+                  "last_route": dict(_JEV_LAST) if _JEV_LAST["t"] else None}
     # 4) 渠道警报尾行
     try:
         p = os.path.join(channels.DATA_DIR, "渠道警报.log")
@@ -2466,6 +2468,58 @@ def _sanitize_upstream_messages(payload):
     p2 = dict(payload)
     p2["messages"] = cleaned
     return p2
+
+
+# ---------------------------------------------------------------- Jev 意图路由（2026-09-24 计划第二步落地）
+_JEV_LAST = {"t": None, "decision": None}
+
+
+def _jev_decide(state_text):
+    """Jev 分类请求档位 → (free-xxx, decision|None)。失败回退 balanced。"""
+    if not state_text or not _jev_key():
+        return "free-balanced", None
+    body = {"state": state_text[:1500], "model": "jev-latest", "questions": {
+        "tier": {"type": "choice", "instructions": "该用户请求应交给哪一档模型处理？",
+                 "criteria": {"fast": "简单问答/短文/翻译/闲聊/格式转换等轻量任务",
+                              "balanced": "通用任务/长文写作/摘要/中等复杂度处理",
+                              "heavy": "深度推理/编程实现/复杂规划/多步 Agent 任务"}}}}
+    try:
+        jreq = urllib.request.Request(
+            "https://api.typesafe.ai/v1/systemone",
+            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "Authorization": "Bearer " + _jev_key()}, method="POST")
+        with urllib.request.urlopen(jreq, timeout=8) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        a = d["answers"]["tier"]
+        conf = float(a.get("confidence") or 0)
+        tier = "free-" + a["choice"]
+        if tier not in ("free-fast", "free-balanced", "free-heavy"):
+            return "free-balanced", None
+        if conf < 0.6:
+            tier = "free-heavy"  # 置信门控：拿不准就上重装线
+        return tier, {"choice": a["choice"], "confidence": conf,
+                      "probabilities": a.get("probabilities")}
+    except Exception:  # noqa: BLE001
+        return "free-balanced", None
+
+
+def _jev_route(payload):
+    """model=auto/free-auto 时用 Jev 意图选档（仅在显式别名时引入决策延迟）。"""
+    m = (payload.get("model") or "").strip()
+    if m not in ("auto", "free-auto"):
+        return
+    last_user = ""
+    for msg in reversed(payload.get("messages") or []):
+        if msg.get("role") == "user":
+            c = msg.get("content")
+            last_user = c if isinstance(c, str) else " ".join(
+                p.get("text", "") for p in (c or []) if isinstance(p, dict))
+            break
+    tier, decision = _jev_decide(last_user)
+    payload["model"] = tier
+    _JEV_LAST["t"] = time.strftime("%H:%M:%S")
+    _JEV_LAST["decision"] = decision
 
 
 def _speed_test_data():
