@@ -2480,9 +2480,9 @@ def _jev_decide(state_text):
         return "free-balanced", None
     body = {"state": state_text[:1500], "model": "jev-latest", "questions": {
         "tier": {"type": "choice", "instructions": "该用户请求应交给哪一档模型处理？",
-                 "criteria": {"fast": "简单问答/短文/翻译/闲聊/格式转换等轻量任务",
-                              "balanced": "通用任务/长文写作/摘要/中等复杂度处理",
-                              "heavy": "深度推理/编程实现/复杂规划/多步 Agent 任务"}}}}
+                 "criteria": {"fast": "一句话就能完成的即时响应：翻译单词短语、事实问答、闲聊、改一两处错字、格式转换，无需产出成段内容",
+                              "balanced": "需要产出成段或结构化内容：写作邮件/公告/报告、总结、解释概念并举例子、整理纪要清单，产出量中等的日常任务",
+                              "heavy": "需要多步推理/写代码实现系统/架构设计/性能分析调优/数学证明等高认知强度任务"}}}}
     try:
         jreq = urllib.request.Request(
             "https://api.typesafe.ai/v1/systemone",
