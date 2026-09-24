@@ -1781,6 +1781,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/health":
             self._send_json(200, {"llm": channels.cached_health_all(),
                                   "hidden": channels.hidden_channels_meta(),
+                                  "sealed": channels.get_sealed_channels(),
                                   "time": time_str()})
         elif path == "/api/channels":
             self._send_json(200, {"channels": channels.cached_health_all()})

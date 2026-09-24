@@ -709,6 +709,8 @@ a{color:inherit}
 .log-cols .data-sheet{width:100%}
 .log-cols .data-sheet td,.log-cols .data-sheet th{padding-left:9px;padding-right:9px}
 @media(max-width:1500px){.log-cols{grid-template-columns:1fr}}
+.channel-card.sealed{opacity:.55;filter:saturate(.35)}
+.channel-card.sealed .channel-name{color:var(--muted)}
 .log-src-tag{font-size:9px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-right:4px}
 .analytics-summary{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.analytics-stat{padding:20px 18px}.analytics-stat+.analytics-stat{border-left:1px solid var(--line)}.analytics-stat .v{font-size:28px;font-weight:680}.analytics-stat .l{font-size:8px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:5px}.bar-list{display:flex;flex-direction:column;gap:11px}.bar-row{display:grid;grid-template-columns:120px 1fr 72px;align-items:center;gap:12px}.bar-label{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar-track{height:4px;background:var(--line-2);position:relative}.bar-fill{position:absolute;inset:0 auto 0 0;background:var(--ink);min-width:1px}.bar-value{text-align:right;font-family:var(--font-mono);font-size:9px;color:var(--muted)}
 
@@ -1368,7 +1370,7 @@ body{position:relative}
 
       <section class="view" id="view-channels" data-view="channels">
         <div class="view-head"><div><div class="view-kicker">03 / Resource state</div><div class="view-title" data-i18n="channelsTitle">Channel Registry</div><div class="view-sub" data-i18n="channelsSub">把健康、凭据、限流与用量分开表达。成员冷却、渠道限流、共享代理故障域从不合并成一个“健康”状态。</div></div><div class="view-tools"><button class="ghost-btn" id="channelsRefresh" data-i18n="refreshHealth">Refresh health</button></div></div>
-        <div class="section"><div class="section-head"><div class="section-title" data-i18n="liveRegistry">Live registry</div><div class="channel-filter-tabs" id="channelFilterTabs"><button class="filter-tab active" data-filter="all">全部</button><button class="filter-tab" data-filter="free">🟢 免费渠道</button><button class="filter-tab" data-filter="paid">🔴 付费渠道</button></div><div class="section-note" data-i18n="credNote">Credential status 永不回显明文 key，只显示 Configured / Missing 与掩码。</div></div><div class="channels-layout" id="channelsLayout"><div class="channel-grid" id="channelGrid"></div><div class="channel-detail-pane" id="channelDetailPane"></div></div></div>
+        <div class="section"><div class="section-head"><div class="section-title" data-i18n="liveRegistry">Live registry</div><div class="channel-filter-tabs" id="channelFilterTabs"><button class="filter-tab active" data-filter="all">全部</button><button class="filter-tab" data-filter="free">🟢 免费渠道</button><button class="filter-tab" data-filter="paid">🔴 付费渠道</button><button class="filter-tab" data-filter="sealed">🗄️ 封存渠道</button></div><div class="section-note" data-i18n="credNote">Credential status 永不回显明文 key，只显示 Configured / Missing 与掩码。</div></div><div class="channels-layout" id="channelsLayout"><div class="channel-grid" id="channelGrid"></div><div class="channel-detail-pane" id="channelDetailPane"></div></div></div>
         <div class="section"><div class="section-head"><div class="section-title" data-i18n="rateLedger">Rate-limit ledger</div><div class="section-note" data-i18n="rateNote">open / throttled / blocked 是渠道/凭据限流状态，与成员 30s 冷却、fault domain breaker 分开。</div></div><div style="overflow:auto"><table class="data-sheet"><thead><tr><th data-i18n="thChannel">Channel</th><th data-i18n="thState">State</th><th>1m</th><th data-i18n="thDay">Day</th><th data-i18n="thSkipped">Skipped</th><th data-i18n="thSource">Source</th><th data-i18n="thNote">Note</th></tr></thead><tbody id="rateTable"></tbody></table></div></div>
       </section>
 
@@ -1810,7 +1812,8 @@ async function renderOps(){
    必须让"只有目录、还没配路由"的别名也能出现在编排页，否则新建的别名看不到）。
    页面在并集为空时走空状态分支，不再渲染空列表。 */
 function aliases(){const cat=state.catalog&&state.catalog.catalog||{};const routes=state.catalog&&state.catalog.routes||{};return Array.from(new Set([...Object.keys(cat),...Object.keys(routes)])).sort((a,b)=>a.localeCompare(b))}
-function channels(){const reg=state.catalog&&state.catalog.registry||{};const h=state.health&&state.health.llm||{};const r=state.rate&&state.rate.channels||{};return Array.from(new Set([...Object.keys(reg),...Object.keys(h),...Object.keys(r)])).sort((a,b)=>a.localeCompare(b))}
+function sealedChannels(){return (state.health&&state.health.sealed)||[]}function isSealed(cid){return sealedChannels().includes(cid)}
+function channels(){const reg=state.catalog&&state.catalog.registry||{};const h=state.health&&state.health.llm||{};const r=state.rate&&state.rate.channels||{};return Array.from(new Set([...Object.keys(reg),...Object.keys(h),...Object.keys(r)])).sort((a,b)=>((isSealed(b)?1:0)-(isSealed(a)?1:0))||a.localeCompare(b))}
 function todayUsage(){return state.usage&&state.usage.today_usage||{}}
 function totalsToday(){let o={calls:0,input_tokens:0,output_tokens:0,errors:0};Object.values(todayUsage()).forEach(v=>{v=v||{};for(const k in o)o[k]+=Number(v[k])||0});return o}
 function latestLog(alias){for(let i=state.logs.length-1;i>=0;i--){if(!alias||state.logs[i].client_model===alias)return state.logs[i]}return null}
@@ -2749,8 +2752,9 @@ function renderChannels(){
   const all=channels();
   if(!all.length){$('#channelGrid').innerHTML=stateBox('020',t('sbRegEmptyT'),t('sbRegEmptyC'));$('#rateTable').innerHTML='';return}
 
-  const freeList=all.filter(cid=>!isPaidChannel(cid));
-  const paidList=all.filter(cid=>isPaidChannel(cid));
+  const sealedList=all.filter(cid=>isSealed(cid));
+  const freeList=all.filter(cid=>!isPaidChannel(cid)&&!isSealed(cid));
+  const paidList=all.filter(cid=>isPaidChannel(cid)&&!isSealed(cid));
 
   const tabFilter = state.channelFilter || 'all';
   const filterTabs = $('#channelFilterTabs');
@@ -2761,6 +2765,7 @@ function renderChannels(){
       if(f==='all') b.textContent = `${LANG==='zh'?'全部':'All'} (${all.length})`;
       if(f==='free') b.textContent = `🟢 ${LANG==='zh'?'免费渠道':'Free'} (${freeList.length})`;
       if(f==='paid') b.textContent = `🔴 ${LANG==='zh'?'付费渠道':'Paid'} (${paidList.length})`;
+      if(f==='sealed') b.textContent = `🗄️ ${LANG==='zh'?'封存渠道':'Sealed'} (${all.filter(cid=>isSealed(cid)).length})`;
     });
   }
 
@@ -2778,7 +2783,8 @@ function renderChannels(){
     const reachable=typeof h.reachable==='boolean'?h.reachable:null;
     const u=todayUsage()[cid]||{};
     const paid=isPaidChannel(cid);
-    return `<article class="channel-card${detCid===cid?' sel':''}" data-cid="${esc(cid)}" title="${esc((h.name||cid)+' · '+(paid?'付费渠道':'免费渠道'))}">
+    const sealed=isSealed(cid);
+    return `<article class="channel-card${detCid===cid?' sel':''}${sealed?' sealed':''}" data-cid="${esc(cid)}" title="${esc((h.name||cid)+' · '+(sealed?'封存 · 等活动恢复':(paid?'付费渠道':'免费渠道')))}">
       <div class="channel-head">
         <div class="channel-idwrap">
           <img class="brand-ic" src="${esc(h.icon||'')}" alt="" data-initial="${esc(cid.charAt(0).toUpperCase())}" onerror="this.outerHTML='<span class=&quot;brand-fb&quot;>'+this.dataset.initial+'</span>'">
@@ -2790,6 +2796,7 @@ function renderChannels(){
         <div class="channel-status">
           <span class="tag ${enabled?'solid':'missing'}">${enabled?t('hEnabled'):t('hDisabled')}</span>
           <span class="tag ${reachable===true?'':reachable===false?'dim':'missing'}">${reachable===true?t('hReach'):reachable===false?t('hUnreach'):t('healthUnknown')}</span>
+          ${sealed?'<span class="tag dim">封存</span>':''}
           ${channelBillingTag(cid)}
         </div>
       </div>
@@ -2831,6 +2838,19 @@ function renderChannels(){
         </div>
         <span class="count-pill">${paidList.length}</span>
       </div>` + paidList.map(makeCard).join('');
+    }
+  }
+
+  if(tabFilter === 'all' || tabFilter === 'sealed'){
+    if(sealedList.length){
+      html += `<div class="channel-group-divider sealed-group">
+        <div class="group-title-wrap">
+          <span class="group-icon">🗄️</span>
+          <span class="group-title">${LANG==='zh'?'封存渠道':'Sealed Channels'}</span>
+          <span class="group-desc">${LANG==='zh'?'活动结束/暂不可用 · 有活动随时解封':'Inactive · re-enable when promotions return'}</span>
+        </div>
+        <span class="count-pill">${sealedList.length}</span>
+      </div>` + sealedList.map(makeCard).join('');
     }
   }
 

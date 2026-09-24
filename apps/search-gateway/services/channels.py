@@ -398,6 +398,13 @@ def get_hidden_channels():
     return [c for c in hs if isinstance(c, str) and c]
 
 
+def get_sealed_channels():
+    """封存渠道（2026-09-24 郭老师指令）：活动结束/等恢复的渠道，注册表沉底展示；
+    路由本就被 guard deny_all 拦截，封存只是语义与展示层。"""
+    cfg = _load_config()
+    return [c for c in (cfg.get("sealed_channels") or []) if isinstance(c, str) and c]
+
+
 def set_hidden_channel(channel_id, hidden):
     """隐藏/恢复渠道。隐藏后从列表/模型/路由聚合里消失；内置与自定义渠道均可隐藏。"""
     cfg = _load_config()
